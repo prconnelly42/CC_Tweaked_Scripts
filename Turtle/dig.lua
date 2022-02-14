@@ -1,3 +1,5 @@
+local TU = require "turtle_utilities"
+
 VALID_FUEL = {'minecraft:coal', 'minecraft:charcoal', 'minecraft:coal_block', 'minecraft:lava_bucket'}
 INVALID_BLOCKS = {'minecraft:gravel', 'minecraft:sand', 'minecraft:charcoal', 'minecraft:anvil',
 'minecraft:chipped_anvil', 'minecraft:damaged_anvil', 'minecraft:red_sand', 'minecraft:bucket',
@@ -16,6 +18,7 @@ chunk_loader_location_x = 0
 chunk_loader_location_z = 0
 size = 0
 chunk_loader_range = 16
+--local w_modem = peripheral.wrap("right") or error("No modem attached", 0)
 
 
 
@@ -331,6 +334,7 @@ function buildBridgeRow(size)
 end
 
 
+-- Not used?
 function printFuelInfo()
     term.write("Current fuel: ")
     term.write(turtle.getFuelLevel())
@@ -338,6 +342,7 @@ function printFuelInfo()
 end
 
 
+-- Not used?
 function depositBucket()
     local modem = peripheral.wrap("front")
     local turtleName = modem.getNameLocal()
@@ -353,6 +358,7 @@ function depositBucket()
 end
 
 
+-- Not used?
 function refuel()
     print("Refueling")
     local need_more_fuel = true
@@ -418,6 +424,7 @@ function getChunkLoaderIfNotInInventory()
 end
 
 
+-- Not used?
 function retrieveFuel()
     print("Retrieving fuel")
     sleep(0.2)
@@ -592,6 +599,7 @@ function retrieveLastChunkLoader(loader_offset_x, loader_offset_z)
 end
 
 
+-- Not used?
 function depositInventory()
     print("Depositing Inventory")
     sleep(0.2)
@@ -615,9 +623,9 @@ end
 
 function resetState(bridge_flag)
     local success = nil
-    printFuelInfo()
+    TU.printFuelInfo()
     returnToOrigin()
-    success = depositInventory() and retrieveFuel()
+    success = TU.depositAllBlacklist(TU.CHUNK_LOADERS) and TU.retrieveFuel(minimum_fuel_level)
 
     if(AUTO_LOAD_CHUNKS) then
         success = success and getChunkLoaderIfNotInInventory()
@@ -697,7 +705,7 @@ function main()
         print("Program terminated - Resetting")
         resetState(false)
     elseif(arg[1] == "refuel") then
-        refuel()
+        TU.refuel()
     else
         print("Please enter valid command")
     end

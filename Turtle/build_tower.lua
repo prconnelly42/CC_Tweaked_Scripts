@@ -1,3 +1,6 @@
+local TU = require "turtle_utilities"
+
+
 VALID_FUEL = {'minecraft:coal', 'minecraft:charcoal', 'minecraft:coal_block', 'minecraft:lava_bucket'}
 POLISHED_DEEPSLATE = 'minecraft:polished_deepslate'
 DEEPSLATE_BRICKS = 'minecraft:deepslate_bricks'
