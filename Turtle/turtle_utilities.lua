@@ -1,15 +1,21 @@
 -- Module containing various utility functions for turtles
 local M = {}
 
+M.AUTO_LOAD_CHUNKS = true
 M.CHUNK_LOADER_3X3 = 'chunkloaders:basic_chunk_loader'
 M.EMPTY_BUCKET = 'minecraft:bucket'
 M.CHUNK_LOADERS = {'chunkloaders:basic_chunk_loader'}
 M.VALID_FUEL = {'minecraft:coal', 'minecraft:charcoal', 'minecraft:coal_block', 'minecraft:lava_bucket'}
+M.CHUNK_LOADERS = {'chunkloaders:basic_chunk_loader' : 16}
 
 local connected_to_inventory = false
 local network_inventory = nil
 local network_inventory_name = nil
 local turtleName = nil
+local facing_direction = 0
+local turtle_offset = vector.new(0, 0, 0)
+local chunk_loader_offset = nil
+local type_of_chunk_loader = nil
 
 
 -- Print current fuel level to the console
@@ -29,11 +35,27 @@ end
 M.sleep = sleep
 
 
+-- Turn the turtle
+-- @param direction This string is the direction to turn (either "R" or "L")
+-- @return Boolean specifying if we have successfully turned
+function turn(direction)
+    local success
+    if(direction == "R") then
+        success = turtle.turnRight()
+        facing_direction = math.fmod(facing_direction + 1, 4)
+    else
+        success = turtle.turnLeft()
+        facing_direction = math.fmod(facing_direction + 3, 4)
+    end
+    return success
+end
+
+
 -- Scroll the display by one line of text
 -- @param peri This string is the name of the peripheral to wrap (E.g. front, top, back)
 -- @return Boolean specifying if we have successfully connected to the network inventory
 local function connectToInventory(peri)
-    sleep(0.2)
+    sleep(0.3)
     modem = peripheral.wrap(peri)
     turtleName = modem.getNameLocal()
     network_inventory = peripheral.find("inventory")
@@ -101,17 +123,19 @@ function depositAllWhitelist(target_item_list, peri)
         turtle.select(slot)
         local valid_item = false
         local item = turtle.getItemDetail()
-        for i, val in ipairs(target_item_list) do
-            if(val == item.name) then
-                valid_item = true
-                break
+        if(item ~= nil) then
+            for i, val in ipairs(target_item_list) do
+                if(val == item.name) then
+                    valid_item = true
+                    break
+                end
             end
-        end
-        if(item ~= nil and valid_item) then
-            network_inventory.pullItems(turtleName, slot)
-            if(turtle.getItemCount() > 0) then
-                print(("Unable to deposit %s"):format(target_item_name))
-                return false
+            if(valid_item) then
+                network_inventory.pullItems(turtleName, slot)
+                if(turtle.getItemCount() > 0) then
+                    print(("Unable to deposit %s"):format(target_item_name))
+                    return false
+                end
             end
         end
     end
@@ -136,17 +160,19 @@ function depositAllBlacklist(target_item_list, peri)
         turtle.select(slot)
         local valid_item = true
         local item = turtle.getItemDetail()
-        for i, val in ipairs(target_item_list) do
-            if(val == item.name) then
-                valid_item = false
-                break
+        if(item ~= nil) then
+            for i, val in ipairs(target_item_list) do
+                if(val == item.name) then
+                    valid_item = false
+                    break
+                end
             end
-        end
-        if(item ~= nil and valid_item) then
-            network_inventory.pullItems(turtleName, slot)
-            if(turtle.getItemCount() > 0) then
-                print(("Unable to deposit %s"):format(target_item_name))
-                return false
+            if(valid_item) then
+                network_inventory.pullItems(turtleName, slot)
+                if(turtle.getItemCount() > 0) then
+                    print(("Unable to deposit %s"):format(target_item_name))
+                    return false
+                end
             end
         end
     end
@@ -285,6 +311,19 @@ end
 M.getNumOfThisItemInInventory = getNumOfThisItemInInventory
 
 
+-- Test if turtle inventory is empty
+-- @return Boolean true if inventory is empty, false otherwise
+function isInventoryEmpty()
+    for i=1,16 do
+        turtle.select(i)
+        if(turtle.getItemCount() ~= 0) then
+            return false
+        end
+    end
+    return true
+end
+
+
 -- Check if the slot has a chunk loader
 -- @param slot (Optional) This number refers to the slot we are looking at
 -- @return Boolean specifying if there is a chunk loader in this slot
@@ -331,5 +370,174 @@ end
 M.placeItemOfType = placeItemOfType
 
 
+-- Place a chunk loader up
+-- @return Boolean specifying if we have successfully placed
+function placeChunkLoader()
+    local success = false
+    for i=1,16 do
+        turtle.select(i)
+        if(isChunkLoader() and turtle.placeUp()) then
+            success = true
+            chunk_loader_location_z = offset_from_origin_z
+            chunk_loader_location_x = offset_from_origin_x
+            break
+        end
+    end
+
+    return success
+end
+M.placeChunkLoader = placeChunkLoader
+
+-- Place a new chunk loader, retrieve the previous, and return to the current position
+-- @param new_offset This vector offset the turtle wants to move to
+-- @param check_separation This boolean, if true, means we should only replace the chunk loader
+-- if we are about to exceed its maximum range
+-- @return Boolean specifying if we have succeeded
+function replaceChunkLoader(new_offset, check_separation)
+    check_separation = check_separation or false
+    if(AUTO_LOAD_CHUNKS) then
+        local separation = new_offset:sub(chunk_loader_offset)
+        local chunk_loader_range = M.CHUNK_LOADERS[type_of_chunk_loader]
+        if(separation:length() > chunk_loader_range - 1) then
+            local old_chunk_loader_offset = chunk_loader_offset
+            if(placeChunkLoader()) then
+                print("Placed chunk loader")
+            else
+                print("Failed to place chunk loader")
+                return false
+            end
+            if(retrieveLastChunkLoader(old_chunk_loader_offset)) then
+                print("Retrieved previous chunk loader")
+            else
+                print("Failed to retrieve previous chunk loader")
+                return false
+            end
+        end
+    end
+    return true
+end
+
+
+-- Move the turtle backward one spot
+-- @return Boolean specifying if we have successfully moved
+function moveBackward()
+    local new_offset = turtle_offset
+
+    if(facing_direction == 0) then
+        new_offset = turtle_offset:add(vector.new(0, 0, -1))
+    elseif(facing_direction == 1) then
+        new_offset = turtle_offset:add(vector.new(-1, 0, 0))
+    elseif(facing_direction == 2) then
+        new_offset = turtle_offset:add(vector.new(0, 0, 1))
+    elseif(facing_direction == 3) then
+        new_offset = turtle_offset:add(vector.new(1, 0, 0))
+    end
+
+    if(not replaceChunkLoader(new_offset, true)) then
+        return false
+    end
+
+    if(not turtle.back())
+        return false
+    else
+        turtle_offset = new_offset
+        return true
+    end
+
+end
+M.moveBackward = moveBackward
+
+-- Move the turtle forward one spot
+-- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
+-- @return Boolean specifying if we have successfully moved
+function moveForward(can_dig)
+    can_dig = can_dig or true
+    local new_offset = turtle_offset
+
+    if(facing_direction == 0) then
+        new_offset = turtle_offset:add(vector.new(0, 0, 1))
+    elseif(facing_direction == 1) then
+        new_offset = turtle_offset:add(vector.new(1, 0, 0))
+    elseif(facing_direction == 2) then
+        new_offset = turtle_offset:add(vector.new(0, 0, -1))
+    elseif(facing_direction == 3) then
+        new_offset = turtle_offset:add(vector.new(-1, 0, 0))
+    end
+
+    if(not replaceChunkLoader(new_offset, true)) then
+        return false
+    end
+
+    while(can_dig and turtle.detect()) do
+        turtle.dig()
+    end
+
+    if(not turtle.forward())
+        return false
+    else
+        turtle_offset = new_offset
+        return true
+    end
+end
+M.moveForward = moveForward
+
+
+-- Move the turtle up one spot
+-- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
+-- @return Boolean specifying if we have successfully moved
+function moveUp(can_dig)
+    can_dig = can_dig or true
+    local new_offset = turtle_offset
+
+    new_offset = turtle_offset:add(vector.new(0, 1, 0))
+
+    if(not replaceChunkLoader(new_offset, true)) then
+        return false
+    end
+
+    while(can_dig and turtle.detectUp()) do
+        turtle.digUp()
+    end
+
+    if(not turtle.up())
+        return false
+    else
+        turtle_offset = new_offset
+        return true
+    end
+end
+M.moveUp = moveUp
+
+
+
+-- Move the turtle down one spot
+-- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
+-- @return Boolean specifying if we have successfully moved
+function moveDown(can_dig)
+    can_dig = can_dig or true
+    local new_offset = turtle_offset
+
+    new_offset = turtle_offset:add(vector.new(0, -1, 0))
+
+    if(not replaceChunkLoader(new_offset, true)) then
+        return false
+    end
+
+    while(can_dig and turtle.detectDown()) do
+        turtle.digDown()
+    end
+
+    if(not turtle.down())
+        return false
+    else
+        turtle_offset = new_offset
+        return true
+    end
+end
+M.moveDown = moveDown
+
+
 
 return M
+
+
