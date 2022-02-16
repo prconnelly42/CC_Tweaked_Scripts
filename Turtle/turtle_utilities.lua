@@ -1,3 +1,5 @@
+local U = require "utilities"
+
 -- Module containing various utility functions for turtles
 local M = {}
 
@@ -24,16 +26,6 @@ local function printFuelInfo()
 end
 M.printFuelInfo = printFuelInfo
 
--- Pause for a specified period of time
--- @param n This is a float specifing the number of seconds to sleep
-local function sleep(n)
-    local t = os.clock()
-    while os.clock() - t <= n do
-      -- nothing
-    end
-end
-M.sleep = sleep
-
 
 -- Turn the turtle
 -- @param direction This string is the direction to turn (either "R" or "L")
@@ -55,7 +47,7 @@ end
 -- @param peri This string is the name of the peripheral to wrap (E.g. front, top, back)
 -- @return Boolean specifying if we have successfully connected to the network inventory
 local function connectToInventory(peri)
-    sleep(0.3)
+    U.sleep(0.3)
     modem = peripheral.wrap(peri)
     turtleName = modem.getNameLocal()
     network_inventory = peripheral.find("inventory")
@@ -322,6 +314,81 @@ function isInventoryEmpty()
     end
     return true
 end
+M.isInventoryEmpty = isInventoryEmpty
+
+
+-- Test if there is at least one empty slot in turtle inventory
+-- @return Boolean true if empty slot exists
+function emptySlotExists()
+    for i=1,16 do
+        if(turtle.getItemCount(i) == 0) then
+            return true
+        end
+    end
+    return false
+end
+M.emptySlotExists = emptySlotExists
+
+
+-- Check that an item from the given list is in the turtle's inventory
+-- @param target_item_name This table is the list to check
+-- @return Boolean true if an item from the list is present
+function turtleHasItemInList(target_item_list)
+    for i=1,16 do
+        turtle.select(i)
+        if(TU.selectedSlotHasItemInThisList(target_item_list)) then
+            return true
+        end
+    end
+    return false
+end
+M.turtleHasItemInList = turtleHasItemInList
+
+
+-- Check that an item from the turtle's inventory is not in the given list
+-- @param target_item_name This table is the list to check
+-- @return Boolean true if an item not from the list is present
+function turtleHasItemNotInList(target_item_list)
+    for i=1,16 do
+        turtle.select(i)
+        if(not TU.selectedSlotHasItemInThisList(target_item_list)) then
+            return true
+        end
+    end
+    return false
+end
+M.turtleHasItemNotInList = turtleHasItemNotInList
+
+
+-- Get at least one chunk loader from the network inventory
+-- @return Boolean true if chunk loader was retrieved
+function retrieveChunkLoaders()
+    print("Retrieving fuel")
+    peri = peri or "front"
+    if(not connected_to_inventory and not connectToInventory(peri)) then
+        print("Not connected to network")
+        print("Unable to retrieve fuel")
+        return false
+    end
+
+    local count = 0 
+    -- Look at every item in the chest
+    for slot, item in pairs(chest.list()) do
+        -- Compare this item to every valid chunk loader
+        for i, val in ipairs(CHUNK_LOADERS) do
+            if(val == item.name) then
+                num_pulled = chest.pushItems(turtleName, slot)
+                count = count + num_pulled
+                print(("Retrieved %d %s from chest"):format(num_pulled, item.name))
+                if(count > 0) then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+M.retrieveChunkLoaders = retrieveChunkLoaders
 
 
 -- Check if the slot has a chunk loader
@@ -333,29 +400,91 @@ end
 M.isChunkLoader = isChunkLoader
 
 
+-- Make sure there is 2 chunk loaders in inventory, or 1 placed and one in inventory
+-- @return Boolean specifying if there is a chunk loader in this slot
+function getChunkLoaderIfNotInInventory()
+    local total = 0
+    if(chunk_loader_offset ~= nil) then
+        total = 1
+    end
+    for i=1,16 do
+        turtle.select(i)
+        local count = turtle.getItemCount()
+        if(isChunkLoader() and count > 0) then
+            total = total + count
+            if(total > 1) then
+                return true
+            end
+        end
+    end
+    while(retrieveChunkLoaders() and total < 2) do
+    end
+    return total > 1
+end
+M.getChunkLoaderIfNotInInventory = getChunkLoaderIfNotInInventory
+
+
+-- Place a specific item in a specific direction
+-- @param direction This string is the name of the direction to place in
+-- @param slot (Optional) This number is the slot with the item we are attempting to place (Defaults to selected)
+-- @param can_dig (Optional) This boolean specifies if we can dig the current block that is present (Defaults to false)
+-- @return Boolean specifying if we have successfully placed the item
+local function placeItem(direction, slot, can_dig)
+    slot = slot or turtle.getSelectedSlot()
+    assert(slot > 0 and slot < 17)
+    turtle.select(slot)
+    can_dig = can_dig or false
+    local item = turtle.getItemDetail()
+    if(item ~= nil) then
+        if(direction == "forward") then
+            while(can_dig and turtle.detect()) do
+                turtle.dig()
+            end
+            return turtle.place()
+        elseif(direction == "up") then
+            while(can_dig and turtle.detectUp()) do
+                turtle.digUp()
+            end
+            return turtle.placeUp()
+        elseif(direction == "down") then
+            while(can_dig and turtle.detectDown()) do
+                turtle.digDown()
+            end
+            return turtle.placeDown()
+        else
+            print("Invalid direction")
+            return false
+        end
+    end
+    return false
+end
+M.placeItemOfType = placeItemOfType
+
+
 -- Place a specific item in a specific direction
 -- @param target_item_name This string is the name of the item to place
 -- @param direction This string is the name of the direction to place in
--- @param can_dig This boolean specifies if we can dig the current block that is present
+-- @param can_dig (Optional) This boolean specifies if we can dig the current block that is present (Defaults to false)
 -- @return Boolean specifying if we have successfully placed the item
 local function placeItemOfType(target_item_name, direction, can_dig)
+    can_dig = can_dig or false
     for i=0,16 do
         if(i ~= 0) then
             turtle.select(i)
         end
         if(selectedSlotHasThisItem(target_item_name)) then
             if(direction == "forward") then
-                if(can_dig and turtle.detect()) then
+                while(can_dig and turtle.detect()) do
                     turtle.dig()
                 end
                 return turtle.place()
             elseif(direction == "up") then
-                if(can_dig and turtle.detectUp()) then
+                while(can_dig and turtle.detectUp()) do
                     turtle.digUp()
                 end
                 return turtle.placeUp()
             elseif(direction == "down") then
-                if(can_dig and turtle.detectDown()) then
+                while(can_dig and turtle.detectDown()) do
                     turtle.digDown()
                 end
                 return turtle.placeDown()
@@ -373,18 +502,15 @@ M.placeItemOfType = placeItemOfType
 -- Place a chunk loader up
 -- @return Boolean specifying if we have successfully placed
 function placeChunkLoader()
-    local success = false
     for i=1,16 do
         turtle.select(i)
         if(isChunkLoader() and turtle.placeUp()) then
-            success = true
-            chunk_loader_location_z = offset_from_origin_z
-            chunk_loader_location_x = offset_from_origin_x
-            break
+            chunk_loader_offset = turtle_offset:add(vector.new(0, 1, 0))
+            return true
         end
     end
 
-    return success
+    return false
 end
 M.placeChunkLoader = placeChunkLoader
 

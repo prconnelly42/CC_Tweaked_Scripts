@@ -1,178 +1,44 @@
 local TU = require "turtle_utilities"
+local U = require "utilities"
 
-VALID_FUEL = {'minecraft:coal', 'minecraft:charcoal', 'minecraft:coal_block', 'minecraft:lava_bucket'}
 INVALID_BLOCKS = {'minecraft:gravel', 'minecraft:sand', 'minecraft:charcoal', 'minecraft:anvil',
 'minecraft:chipped_anvil', 'minecraft:damaged_anvil', 'minecraft:red_sand', 'minecraft:bucket',
 'chunkloaders:basic_chunk_loader', 'minecraft:lava_bucket'}
-CHUNK_LOADERS = {'chunkloaders:basic_chunk_loader'}
-AUTO_LOAD_CHUNKS = true
 
-offset_from_origin_x = 0
-offset_from_origin_z = 0
-offset_from_origin_y = 0
-facing_direction = 0
 current_length = 0
 minimum_fuel_level = 0
 reset = false
-chunk_loader_location_x = 0
-chunk_loader_location_z = 0
 size = 0
-chunk_loader_range = 16
 --local w_modem = peripheral.wrap("right") or error("No modem attached", 0)
 
 
-
-function sleep(n)
-    local t = os.clock()
-    while os.clock() - t <= n do
-      -- nothing
-    end
+-- Check if the slot has a block we should not place
+-- @param slot (Optional) This number refers to the slot we are looking at
+-- @return Boolean true if the block in the specified slot is valid
+function isNotInvalidBlock(slot)
+    return not TU.selectedSlotHasItemInThisList(INVALID_BLOCKS, slot)
 end
 
 
-function moveBackward()
-    turtle.back()
-    if(facing_direction == 0) then
-        offset_from_origin_z = offset_from_origin_z - 1
-    elseif(facing_direction == 1) then
-        offset_from_origin_x = offset_from_origin_x - 1
-    elseif(facing_direction == 2) then
-        offset_from_origin_z = offset_from_origin_z + 1
-    elseif(facing_direction == 3) then
-        offset_from_origin_x = offset_from_origin_x + 1
-    end
-end
-
-
-function digAndMoveForward()
-    local new_offset_z = offset_from_origin_z
-    local new_offset_x = offset_from_origin_x
-
-    if(facing_direction == 0) then
-        new_offset_z = offset_from_origin_z + 1
-    elseif(facing_direction == 1) then
-        new_offset_x = offset_from_origin_x + 1
-    elseif(facing_direction == 2) then
-        new_offset_z = offset_from_origin_z - 1
-    elseif(facing_direction == 3) then
-        new_offset_x = offset_from_origin_x - 1
-    end
-
-    if(AUTO_LOAD_CHUNKS) then
-        local separation_z = new_offset_z - chunk_loader_location_z
-        if(math.abs(separation_z) > chunk_loader_range - 1) then
-            local old_chunk_loader_location_x = chunk_loader_location_x
-            local old_chunk_loader_location_z = chunk_loader_location_z
-            if(placeChunkLoader()) then
-                print("chunk loader place")
-            end
-            retrieveLastChunkLoader(old_chunk_loader_location_x, old_chunk_loader_location_z)
-        end
-    end
-
-    while(not turtle.forward()) do
-        turtle.dig()
-    end
-
-    offset_from_origin_z = new_offset_z
-    offset_from_origin_x = new_offset_x
-end
-
-
-function digAndMoveUp()
-    while(not turtle.up()) do
-        turtle.digUp()
-    end
-    offset_from_origin_y = offset_from_origin_y + 1
-end
-
-
-function digAndMoveDown()
-    while(not turtle.down()) do
-        turtle.digDown()
-    end
-    offset_from_origin_y = offset_from_origin_y - 1
-end
-
-
-function updateDirection(direction)
-    if(direction == "R") then
-        turtle.turnRight()
-        facing_direction = math.fmod(facing_direction + 1, 4)
-    else
-        turtle.turnLeft()
-        facing_direction = math.fmod(facing_direction + 3, 4)
-    end
-end
-
-
-function isNotFallingBlock()
-    item = turtle.getItemDetail()
-    item_name = nil
-    if(item ~= nil) then
-        item_name = item.name
-    else
-        return false
-    end
-    for i, val in ipairs(INVALID_BLOCKS) do
-        if(val == item_name) then
-            return false
-        end
-    end
-    return true
-end
-
-
-function isChunkLoader()
-    item = turtle.getItemDetail()
-    item_name = nil
-    if(item == nil) then
-        return false
-    else
-        item_name = item.name
-    end
-    for i, val in ipairs(CHUNK_LOADERS) do
-        if(val == item_name) then
-            return true
-        end
-    end
-    return false
-end
-
-
+-- Check if the turtle has a valid block
+-- @return Boolean true if a valid block exists in the turtle inventory
 function validBlockExists()
-    for i=1,16 do
-        turtle.select(i)
-        if(isNotFallingBlock() and not isChunkLoader()) then
-            return true
-        end
-    end
-    return false
+    return TU.turtleHasItemNotInList(INVALID_BLOCKS)
 end
 
 
-function isInventoryEmpty()
-    for i=1,16 do
-        turtle.select(i)
-        if(turtle.getItemCount() ~= 0) then
-            return false
-        end
-    end
-    return true
-end
-
-
-function placeBlockDown()
+-- Place a bridge block down if necessary
+-- @return Boolean true if a block exists below the turtle
+function placeValidBridgeBlockDown()
     if(turtle.detectDown()) then
         return true
     end
-    if(isNotFallingBlock() and not isChunkLoader() and turtle.placeDown()) then
-        return true
+    if(isNotInvalidBlock()) then
+        return TU.placeItem("down", nil, false)
     end
     for i=1,16 do
-        turtle.select(i)
-        if(isNotFallingBlock() and not isChunkLoader() and turtle.placeDown()) then
-            return true
+        if(isNotInvalidBlock(i)) then
+            return TU.placeItem("down", i, false)
         end
     end
 
@@ -182,39 +48,27 @@ function placeBlockDown()
 end
 
 
-function placeChunkLoader()
-    local success = false
-    for i=1,16 do
-        turtle.select(i)
-        if(isChunkLoader() and turtle.placeUp()) then
-            success = true
-            chunk_loader_location_z = offset_from_origin_z
-            chunk_loader_location_x = offset_from_origin_x
-            break
-        end
-    end
-
-    return success
-end
-
-
+-- Dig one square of the tunnel
+-- @param size This number is the width of the tunnel square
+-- @param build_bridge Boolean true means we place down bridge blocks as we dig
+-- @return Boolean specifying if we have successfully dug a square
 function digTunnelSquare(size, build_bridge)
-    moveCursorToBeginningOfLine()
+    U.moveCursorToBeginningOfLine()
     term.write(("Building row %d\n"):format(current_length + 1))
     if(size <=0) then
         print("Tunnel size cannot be 0 or negative")
         return false
     elseif(size == 1) then
-        digAndMoveForward()
+        TU.moveForward()
         if(build_bridge) then
-            placeBlockDown()
+            placeValidBridgeBlockDown()
         end
     else
         current_line = 1
         -- Dig one square of dimensions (size x size)
-        digAndMoveForward()
+        TU.moveForward()
         if(build_bridge) then
-            placeBlockDown()
+            placeValidBridgeBlockDown()
         end
         while(current_line <= size) do
             local start_from_left = false
@@ -223,18 +77,18 @@ function digTunnelSquare(size, build_bridge)
             end
             position = 1
             if(start_from_left) then
-                updateDirection("R")
+                TU.turn("R")
             else
-                updateDirection("L")
+                TU.turn("L")
             end
 
             while(position < size) do
                 if(current_line < size) then
                     turtle.digUp()
                 end
-                digAndMoveForward()
+                TU.moveForward()
                 if(current_line == 1 and build_bridge) then
-                    placeBlockDown()
+                    placeValidBridgeBlockDown()
                 end
                 position = position + 1
             end
@@ -244,19 +98,19 @@ function digTunnelSquare(size, build_bridge)
 
 
             if(start_from_left) then
-                updateDirection("L")
+                TU.turn("L")
             else
-                updateDirection("R")
+                TU.turn("R")
             end
             
             -- Move up a line or back to the bottom
             if(current_line < size - 1) then
-                digAndMoveUp()
-                digAndMoveUp()
+                TU.moveUp()
+                TU.moveUp()
                 current_line = current_line + 2
             else
                 while(current_line > 1) do
-                    digAndMoveDown()
+                    TU.moveDown()
                     current_line = current_line - 1
                 end
                 current_line = size + 1
@@ -266,7 +120,7 @@ function digTunnelSquare(size, build_bridge)
 
     current_length = current_length + 1
     minimum_fuel_level = size*size + current_length
-    if(AUTO_LOAD_CHUNKS) then
+    if(TU.AUTO_LOAD_CHUNKS) then
         minimum_fuel_level = size*size + current_length*2
     end
 
@@ -274,17 +128,8 @@ function digTunnelSquare(size, build_bridge)
 end
 
 
-function moveCursorToBeginningOfLine()
-    term.clearLine()
-    local cursor_x = nil
-    local cursor_y = nil
-    cursor_x, cursor_y = term.getCursorPos()
-    term.setCursorPos(1, cursor_y)
-end
-
-
 function buildBridgeRow(size)
-    moveCursorToBeginningOfLine()
+    U.moveCursorToBeginningOfLine()
     term.write(("Building row %d\n"):format(current_length + 1))
     if(size <=0) then
         print("Bridge size cannot be 0 or negative")
@@ -296,9 +141,9 @@ function buildBridgeRow(size)
         end
 
         for i=1,size do
-            digAndMoveForward()
+            TU.moveForward()
             turtle.digUp()
-            if(not placeBlockDown()) then
+            if(not placeValidBridgeBlockDown()) then
                 return false
             end
 
@@ -308,17 +153,17 @@ function buildBridgeRow(size)
 
             if(i==1) then
                 if(start_from_left) then
-                    updateDirection("R")
+                    TU.turn("R")
                 else
-                    updateDirection("L")
+                    TU.turn("L")
                 end
             end
         end
 
         if(start_from_left) then
-            updateDirection("L")
+            TU.turn("L")
         else
-            updateDirection("R")
+            TU.turn("R")
         end
     end
 
@@ -334,134 +179,9 @@ function buildBridgeRow(size)
 end
 
 
--- Not used?
-function printFuelInfo()
-    term.write("Current fuel: ")
-    term.write(turtle.getFuelLevel())
-    print()
-end
-
-
--- Not used?
-function depositBucket()
-    local modem = peripheral.wrap("front")
-    local turtleName = modem.getNameLocal()
-    local chest = peripheral.find("inventory")
-    local chest_name = peripheral.getName(chest)
-    for slot=1,16 do
-        turtle.select(slot)
-        local item = turtle.getItemDetail()
-        if(item ~= nil and item.name == "minecraft:bucket") then
-            chest.pullItems(turtleName, slot)
-        end
-    end
-end
-
-
--- Not used?
-function refuel()
-    print("Refueling")
-    local need_more_fuel = true
-    for i=1,16 do
-        turtle.select(i)
-        turtle.refuel()
-        if(turtle.getFuelLevel() > minimum_fuel_level) then
-            need_more_fuel = false
-        end
-
-        if(not need_more_fuel) then
-            break
-        end
-    end
-end
-
-
-function retrieveChunkLoaders()
-    print("Retrieving chunk loaders")
-    sleep(0.2)
-    local modem = peripheral.wrap("front")
-    local turtleName = modem.getNameLocal()
-    local chest = peripheral.find("inventory")
-    local chest_name = peripheral.getName(chest)
-    -- While we need more fuel
-    local count = 0 
-    local retrievedFlag = false
-    -- Look at every item in the chest
-    for slot, item in pairs(chest.list()) do
-        -- Compare this item to every valid chunk loader
-        for i, val in ipairs(CHUNK_LOADERS) do
-            if(val == item.name) then
-                num_pulled = chest.pushItems(turtleName, slot)
-                count = count + num_pulled
-                print(("Retrieved %d %s from chest"):format(num_pulled, item.name))
-                if(count > 1) then
-                    retrievedFlag = true
-                    break
-                end
-            end
-        end
-        if(retrievedFlag) then
-            break
-        end
-    end
-    return retrievedFlag
-end
-
-
-function getChunkLoaderIfNotInInventory()
-    local total = 0
-    for i=1,16 do
-        turtle.select(i)
-        local count = turtle.getItemCount()
-        if(isChunkLoader() and count > 0) then
-            total = total + count
-            if(total > 1 or (total == 1 and chunk_loader_location_x ~= nil)) then
-                return true
-            end
-        end
-    end
-    return retrieveChunkLoaders()
-end
-
-
--- Not used?
-function retrieveFuel()
-    print("Retrieving fuel")
-    sleep(0.2)
-    local modem = peripheral.wrap("front")
-    local turtleName = modem.getNameLocal()
-    local chest = peripheral.find("inventory")
-    local chest_name = peripheral.getName(chest)
-    -- While we need more fuel
-    local max_fuel_flag = false 
-        -- Look at every item in the chest
-    for slot, item in pairs(chest.list()) do
-        -- Compare this item to every valid fuel
-        for i, val in ipairs(VALID_FUEL) do
-            if(val == item.name) then
-                if(turtle.getFuelLevel() >= minimum_fuel_level*10) then
-                    max_fuel_flag = true
-                    depositBucket()
-                    break
-                end
-                num_pulled = chest.pushItems(turtleName, slot)
-                print(("Retrieved %d %s from chest"):format(num_pulled, item.name))
-                refuel()
-                depositBucket()
-                break
-            end
-        end
-        if(max_fuel_flag) then
-            break
-        end
-    end
-    return turtle.getFuelLevel() >= minimum_fuel_level
-end
-
-
 function retrieveBlocks()
     print("Retrieving blocks")
-    sleep(0.2)
+    TU.sleep(0.2)
     local modem = peripheral.wrap("front")
     local turtleName = modem.getNameLocal()
     local chest = peripheral.find("inventory")
@@ -499,35 +219,24 @@ function retrieveBlocks()
 end
 
 
-function emptySlotExists()
-    for i=1,16 do
-        if(turtle.getItemCount(i) == 0) then
-            return true
-        end
-    end
-    print("No empty slots")
-    return false
-end
-
-
 function returnToOrigin()
     print("Returning to origin")
     while(offset_from_origin_y > 0) do
-        digAndMoveDown()
+        TU.moveDown()
     end
 
     while(facing_direction ~= 3) do
-        updateDirection("R")
+        TU.turn("R")
     end
     while(offset_from_origin_x > 0) do
-        digAndMoveForward()
+        TU.moveForward()
     end
 
     while(facing_direction ~= 2) do
-        updateDirection("L")
+        TU.turn("L")
     end
     while(offset_from_origin_z > 0) do
-        digAndMoveForward()
+        TU.moveForward()
     end
 end
 
@@ -535,44 +244,44 @@ end
 function goToCurrentEndOfTunnel()
     print("Going to current tunnel end")
     while(facing_direction ~= 0) do
-        updateDirection("R")
+        TU.turn("R")
     end
     while(offset_from_origin_z < current_length) do
-        digAndMoveForward()
+        TU.moveForward()
     end
 end
 
 
 function goToOffsetLocation(x, y, z)
     while(offset_from_origin_y > y) do
-        digAndMoveDown()
+        TU.moveDown()
     end
     while(offset_from_origin_y < y) do
-        digAndMoveUp()
+        TU.moveUp()
     end
     while(offset_from_origin_x > x) do
         while(facing_direction ~= 3) do
-            updateDirection("R")
+            TU.turn("R")
         end
-            digAndMoveForward()
+            TU.moveForward()
     end
     while(offset_from_origin_x < x) do
         while(facing_direction ~= 1) do
-            updateDirection("R")
+            TU.turn("R")
         end
-            digAndMoveForward()
+            TU.moveForward()
     end
     while(offset_from_origin_z < z) do
         while(facing_direction ~= 0) do
-            updateDirection("R")
+            TU.turn("R")
         end
-            digAndMoveForward()
+            TU.moveForward()
     end
     while(offset_from_origin_z > z) do
         while(facing_direction ~= 2) do
-            updateDirection("R")
+            TU.turn("R")
         end
-            digAndMoveForward()
+            TU.moveForward()
     end
 end
 
@@ -594,30 +303,8 @@ function retrieveLastChunkLoader(loader_offset_x, loader_offset_z)
     -- last location is to the left
     goToOffsetLocation(turtle_offset_x, 0, turtle_offset_z)
     while(facing_direction ~= turtle_current_direction) do
-        updateDirection("R")
+        TU.turn("R")
     end
-end
-
-
--- Not used?
-function depositInventory()
-    print("Depositing Inventory")
-    sleep(0.2)
-    local modem = peripheral.wrap("front")
-    local turtleName = modem.getNameLocal()
-    local chest = peripheral.find("inventory")
-    local chest_name = peripheral.getName(chest)
-    for slot=1,16 do
-        turtle.select(slot)
-        if(not isChunkLoader()) then
-            num_moved = chest.pullItems(turtleName, slot)
-            if(turtle.getItemCount() > 0 and num_moved == 0) then
-                print("Error - Unable to deposit blocks")
-                return false
-            end
-        end
-    end
-    return true
 end
 
 
@@ -628,7 +315,7 @@ function resetState(bridge_flag)
     success = TU.depositAllBlacklist(TU.CHUNK_LOADERS) and TU.retrieveFuel(minimum_fuel_level)
 
     if(AUTO_LOAD_CHUNKS) then
-        success = success and getChunkLoaderIfNotInInventory()
+        success = success and TU.getChunkLoaderIfNotInInventory()
         local old_chunk_loader_location_x = chunk_loader_location_x
         local old_chunk_loader_location_z = chunk_loader_location_z
         if(placeChunkLoader()) then
@@ -641,8 +328,8 @@ function resetState(bridge_flag)
         success = success and (retrieveBlocks() or validBlockExists())
     end
     
-    updateDirection("R")
-    updateDirection("R")
+    TU.turn("R")
+    TU.turn("R")
     reset = true
     print(("Reset successful: %s"):format(tostring(success)))
     return success
@@ -677,7 +364,7 @@ function main()
         end
         resetState(bridge_flag)
         while (current_length < target_length) do
-            if(turtle.getFuelLevel() > minimum_fuel_level and (bridge_flag or emptySlotExists())) then
+            if(turtle.getFuelLevel() > minimum_fuel_level and (bridge_flag or TU.emptySlotExists())) then
                 if(reset) then
                     goToCurrentEndOfTunnel()
                     reset = false
