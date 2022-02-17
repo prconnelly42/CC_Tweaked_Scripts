@@ -128,6 +128,9 @@ function digTunnelSquare(size, build_bridge)
 end
 
 
+-- Build row of the bridge with specified width over 1 block length
+-- @param size This number is the width of the bridge
+-- @return Boolean specifying if we have successfully built a row
 function buildBridgeRow(size)
     U.moveCursorToBeginningOfLine()
     term.write(("Building row %d\n"):format(current_length + 1))
@@ -219,95 +222,26 @@ function retrieveBlocks()
 end
 
 
-function returnToOrigin()
+-- Move the turtle down one spot
+-- @param movement_order Vector - see TU.goToOffset
+-- @return Boolean specifying if we have successfully moved
+function returnToOrigin(movement_order)
     print("Returning to origin")
-    while(offset_from_origin_y > 0) do
-        TU.moveDown()
-    end
-
-    while(facing_direction ~= 3) do
-        TU.turn("R")
-    end
-    while(offset_from_origin_x > 0) do
-        TU.moveForward()
-    end
-
-    while(facing_direction ~= 2) do
-        TU.turn("L")
-    end
-    while(offset_from_origin_z > 0) do
-        TU.moveForward()
-    end
+    return TU.goToOffset(vector.new(0,0,0), movement_order)
 end
 
 
+-- Move the turtle to the current end of the tunnel
+-- @return Boolean specifying if we have successfully moved
 function goToCurrentEndOfTunnel()
     print("Going to current tunnel end")
-    while(facing_direction ~= 0) do
-        TU.turn("R")
-    end
-    while(offset_from_origin_z < current_length) do
-        TU.moveForward()
-    end
+    return TU.goToOffset(vector.new(0, 0, current_length))
 end
 
 
-function goToOffsetLocation(x, y, z)
-    while(offset_from_origin_y > y) do
-        TU.moveDown()
-    end
-    while(offset_from_origin_y < y) do
-        TU.moveUp()
-    end
-    while(offset_from_origin_x > x) do
-        while(facing_direction ~= 3) do
-            TU.turn("R")
-        end
-            TU.moveForward()
-    end
-    while(offset_from_origin_x < x) do
-        while(facing_direction ~= 1) do
-            TU.turn("R")
-        end
-            TU.moveForward()
-    end
-    while(offset_from_origin_z < z) do
-        while(facing_direction ~= 0) do
-            TU.turn("R")
-        end
-            TU.moveForward()
-    end
-    while(offset_from_origin_z > z) do
-        while(facing_direction ~= 2) do
-            TU.turn("R")
-        end
-            TU.moveForward()
-    end
-end
-
-
-function retrieveLastChunkLoader(loader_offset_x, loader_offset_z)
-    if(loader_offset_x == nil or loader_offset_z == nil) then
-        return false
-    end
-    local turtle_offset_x = offset_from_origin_x
-    local turtle_offset_z = offset_from_origin_z
-    local turtle_current_direction = facing_direction
-    print("Getting last chunk loader")
-    -- Go to chunk loader location
-    goToOffsetLocation(loader_offset_x, 0, loader_offset_z)
-    -- Pick up the chunk loader
-    turtle.digUp()
-    print("last chunk loader retrieved")
-    -- Return to last location
-    -- last location is to the left
-    goToOffsetLocation(turtle_offset_x, 0, turtle_offset_z)
-    while(facing_direction ~= turtle_current_direction) do
-        TU.turn("R")
-    end
-end
-
-
+-- Return to program start state
+-- @param bridge_flag Boolean - true if we are building a bridge
+-- @return Boolean - true if we successfully reset
 function resetState(bridge_flag)
     local success = nil
     TU.printFuelInfo()
@@ -335,7 +269,7 @@ function resetState(bridge_flag)
     return success
 end
 
-
+-- Function will always run at program start
 function main()
     if(arg[1] == "tunnel" or arg[1] == "tunnelbridge" or arg[1] == "bridge") then
         tunnelbridge = false

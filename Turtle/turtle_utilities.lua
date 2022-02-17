@@ -14,10 +14,10 @@ local connected_to_inventory = false
 local network_inventory = nil
 local network_inventory_name = nil
 local turtleName = nil
-local facing_direction = 0
+local turtle_facing_direction = 0
 local turtle_offset = vector.new(0, 0, 0)
 local chunk_loader_offset = nil
-local type_of_chunk_loader = nil
+local type_of_chunk_loader = M.CHUNK_LOADER_3X3
 
 
 -- Print current fuel level to the console
@@ -34,13 +34,33 @@ function turn(direction)
     local success
     if(direction == "R") then
         success = turtle.turnRight()
-        facing_direction = math.fmod(facing_direction + 1, 4)
+        turtle_facing_direction = math.fmod(turtle_facing_direction + 1, 4)
     else
         success = turtle.turnLeft()
-        facing_direction = math.fmod(facing_direction + 3, 4)
+        turtle_facing_direction = math.fmod(turtle_facing_direction + 3, 4)
     end
     return success
 end
+M.turn = turn
+
+
+
+-- Turn the turtle to face a particular direction
+-- @param target_facing_direction This number is between 0 and 3, 0 being the direction upon program start
+-- @return Boolean specifying if we are facing the target direction
+function turnToFace(target_facing_direction)
+    assert(target_facing_direction >=0 and target_facing_direction < 4)
+    local success = true
+    if(math.fmod(turtle_facing_direction - target_facing_direction + 4, 4) == 1) then
+        success = success and turn("L")
+    else
+        while(turtle_facing_direction ~= target_facing_direction and success) do
+            success = success and turn("R")
+        end
+    end
+    return success
+end
+M.turnToFace = turnToFace
 
 
 -- Scroll the display by one line of text
@@ -71,6 +91,39 @@ end
 M.disconnectFromInventory = disconnectFromInventory
 
 
+-- Retrieve specific item from network inventory
+-- @param target_item_name This string is the name of the item to deposit
+-- @param count (Optional) Number - how many of this item we're attempting to get
+-- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
+-- @return Boolean specifying if we have successfully retrieved at least one of the target item
+local function retrieveItem(target_item_name, count, peri)
+    assert(target_item_name ~= nil)
+    assert(count > 0)
+    peri = peri or "front"
+    if(not connected_to_inventory and not connectToInventory(peri)) then
+        print("Not connected to network")
+        print(("Unable to retrieve %s"):format(target_item_name))
+        return false
+    end
+
+    local total_pulled = 0
+    for slot, item in pairs(network_inventory.list()) do
+        if(item.name == target_item_name) then
+            local num_pulled = chest.pushItems(turtleName, slot, count)
+            total_pulled = total_pulled + num_pulled
+        end
+    end
+    if(total_pulled > 0) then
+        print(("Retrieved %d %s from chest"):format(total_pulled, target_item_name))
+    end
+    if(total_pulled == 0) then
+        print("Error - Did not retrieve any blocks")
+    end
+    return total_pulled
+end
+M.retrieveItem = retrieveItem
+
+
 -- Deposit all items of a specified name into network inventory
 -- @param target_item_name This string is the name of the item to deposit
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
@@ -86,7 +139,7 @@ local function depositAllOfType(target_item_name, peri)
     for slot=1,16 do
         turtle.select(slot)
         local item = turtle.getItemDetail()
-        if(item ~= nil and (item.name == target_item_name or target_item_name == "ALL")) then
+        if(item ~= nil and (item.name == target_item_name)) then
             network_inventory.pullItems(turtleName, slot)
             if(turtle.getItemCount() > 0) then
                 print(("Unable to deposit %s"):format(target_item_name))
@@ -177,7 +230,7 @@ M.depositAllBlacklist = depositAllBlacklist
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back).
 -- @return Boolean specifying if we have successfully deposited all of the items
 local function depositAll(peri)
-    return depositAllOfType("ALL", peri)
+    return depositAllBlacklist({}, peri)
 end
 M.depositAll = depositAll
 
@@ -402,7 +455,7 @@ M.isChunkLoader = isChunkLoader
 
 -- Make sure there is 2 chunk loaders in inventory, or 1 placed and one in inventory
 -- @return Boolean specifying if there is a chunk loader in this slot
-function getChunkLoaderIfNotInInventory()
+local function getChunkLoaderIfNotInInventory()
     local total = 0
     if(chunk_loader_offset ~= nil) then
         total = 1
@@ -514,6 +567,27 @@ function placeChunkLoader()
 end
 M.placeChunkLoader = placeChunkLoader
 
+
+-- Go get the last chunk loader placed
+-- @param old_chunk_loader_offset - Vector
+-- @param movement_order Vector - see goToOffset()
+-- @return Boolean specifying if we have succeeded
+function retrieveLastChunkLoader(old_chunk_loader_offset, movement_order)
+    assert(old_chunk_loader_offset ~= nil)
+
+    local current_turtle_offset = turtle_offset
+    local current_turtle_direction = turtle_facing_direction
+    
+    print("Getting last chunk loader")
+    goToOffset(old_chunk_loader_offset, movement_order)
+    print("last chunk loader retrieved")
+    goToOffset(current_turtle_offset, movement_order)
+    turnToFace(current_turtle_direction)
+
+    return getNumOfThisItemInInventory(type_of_chunk_loader) > 0
+end
+
+
 -- Place a new chunk loader, retrieve the previous, and return to the current position
 -- @param new_offset This vector offset the turtle wants to move to
 -- @param check_separation This boolean, if true, means we should only replace the chunk loader
@@ -549,13 +623,13 @@ end
 function moveBackward()
     local new_offset = turtle_offset
 
-    if(facing_direction == 0) then
+    if(turtle_facing_direction == 0) then
         new_offset = turtle_offset:add(vector.new(0, 0, -1))
-    elseif(facing_direction == 1) then
+    elseif(turtle_facing_direction == 1) then
         new_offset = turtle_offset:add(vector.new(-1, 0, 0))
-    elseif(facing_direction == 2) then
+    elseif(turtle_facing_direction == 2) then
         new_offset = turtle_offset:add(vector.new(0, 0, 1))
-    elseif(facing_direction == 3) then
+    elseif(turtle_facing_direction == 3) then
         new_offset = turtle_offset:add(vector.new(1, 0, 0))
     end
 
@@ -580,13 +654,13 @@ function moveForward(can_dig)
     can_dig = can_dig or true
     local new_offset = turtle_offset
 
-    if(facing_direction == 0) then
+    if(turtle_facing_direction == 0) then
         new_offset = turtle_offset:add(vector.new(0, 0, 1))
-    elseif(facing_direction == 1) then
+    elseif(turtle_facing_direction == 1) then
         new_offset = turtle_offset:add(vector.new(1, 0, 0))
-    elseif(facing_direction == 2) then
+    elseif(turtle_facing_direction == 2) then
         new_offset = turtle_offset:add(vector.new(0, 0, -1))
-    elseif(facing_direction == 3) then
+    elseif(turtle_facing_direction == 3) then
         new_offset = turtle_offset:add(vector.new(-1, 0, 0))
     end
 
@@ -661,6 +735,50 @@ function moveDown(can_dig)
     end
 end
 M.moveDown = moveDown
+
+
+
+-- Move the turtle to a specific offset
+-- @param target_offset This vector specifies where we want the turtle to go
+-- @param movement_order A String designating the order axes are to be moved on, from left to right
+--  Ex: xyz, zxy, yzx, xy, zx, y. Default is xyz
+-- @return Boolean specifying if the turtle_offset matches the target_offset
+function goToOffset(target_offset, movement_order)
+    movement_order = movement_order or "xyz"
+    for c in movement_order:gmatch"." do
+        if(c == "x") then
+            while(turtle_offset.x > target_offset.x) do
+                turnToFace(3)
+                moveForward()
+            end
+            while(turtle_offset.x < target_offset.x) do
+                turnToFace(1)
+                moveForward()
+            end
+        elseif(c == "y") then
+            while(turtle_offset.y > target_offset.y) do
+                moveDown()
+            end
+            while(turtle_offset.y < target_offset.y) do
+                moveUp()
+            end
+        elseif(c == "z") then
+            while(turtle_offset.z < target_offset.z) do
+                turnToFace(0)
+                moveForward()
+            end
+            while(turtle_offset.z > target_offset.z) do
+                turnToFace(2)
+                moveForward()
+            end
+        else
+            error("Invalid movement order", 0)
+        end
+    end
+    
+    return turtle_offset:equals(target_offset)
+end
+M.goToOffset = goToOffset
 
 
 
