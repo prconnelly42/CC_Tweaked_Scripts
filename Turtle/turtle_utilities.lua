@@ -97,7 +97,7 @@ M.disconnectFromInventory = disconnectFromInventory
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
 -- @return Boolean specifying if we have successfully retrieved at least one of the target item
 local function retrieveItem(target_item_name, count, peri)
-    assert(target_item_name ~= nil)
+    assert(type(target_item_name) == "string")
     assert(count > 0)
     peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
@@ -109,12 +109,13 @@ local function retrieveItem(target_item_name, count, peri)
     local total_pulled = 0
     for slot, item in pairs(network_inventory.list()) do
         if(item.name == target_item_name) then
-            local num_pulled = chest.pushItems(turtleName, slot, count)
+            local num_pulled = network_inventory.pushItems(turtleName, slot, count)
+            count = count - num_pulled
             total_pulled = total_pulled + num_pulled
         end
     end
     if(total_pulled > 0) then
-        print(("Retrieved %d %s from chest"):format(total_pulled, target_item_name))
+        print(("Retrieved %d %s from network inventory"):format(total_pulled, target_item_name))
     end
     if(total_pulled == 0) then
         print("Error - Did not retrieve any blocks")
@@ -122,6 +123,88 @@ local function retrieveItem(target_item_name, count, peri)
     return total_pulled
 end
 M.retrieveItem = retrieveItem
+
+
+-- Retrieve specific item from network inventory
+-- @param item_list This table is a list of the items to skip when retrieving
+-- @param count (Optional) Number - how many items we're attempting to get
+-- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
+-- @return Boolean specifying if we have successfully retrieved at least one item
+local function retrieveItemsBlackList(item_list, count, peri)
+    assert(type(item_list) == "table")
+    assert(count > 0)
+    peri = peri or "front"
+    if(not connected_to_inventory and not connectToInventory(peri)) then
+        print("Not connected to network")
+        print(("Unable to retrieve %s"):format(target_item_name))
+        return false
+    end
+
+    local total_pulled = 0
+    for slot, item in pairs(network_inventory.list()) do
+        local valid_block = true
+        for i, val in ipairs(item_list) do
+            if(val == item.name) then
+                valid_block = false
+                break
+            end
+        end
+        if(valid_block) then
+            local num_pulled = network_inventory.pushItems(turtleName, slot, count)
+            count = count - num_pulled
+            total_pulled = total_pulled + num_pulled
+        end
+    end
+    if(total_pulled > 0) then
+        print(("Retrieved %d from network inventory"):format(total_pulled))
+    end
+    if(total_pulled == 0) then
+        print("Error - Did not retrieve any blocks")
+    end
+    return total_pulled
+end
+M.retrieveItemsBlackList = retrieveItemsBlackList
+
+
+-- Retrieve specific item from network inventory
+-- @param item_list This table is a list of the items retrieve from
+-- @param count (Optional) Number - how many items we're attempting to get
+-- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
+-- @return Boolean specifying if we have successfully retrieved at least one item
+local function retrieveItemsWhiteList(item_list, count, peri)
+    assert(type(item_list) == "table")
+    assert(count > 0)
+    peri = peri or "front"
+    if(not connected_to_inventory and not connectToInventory(peri)) then
+        print("Not connected to network")
+        print(("Unable to retrieve %s"):format(target_item_name))
+        return false
+    end
+
+    local total_pulled = 0
+    for slot, item in pairs(network_inventory.list()) do
+        local valid_block = false
+        for i, val in ipairs(item_list) do
+            if(val == item.name) then
+                valid_block = true
+                break
+            end
+        end
+        if(valid_block) then
+            local num_pulled = network_inventory.pushItems(turtleName, slot, count)
+            count = count - num_pulled
+            total_pulled = total_pulled + num_pulled
+        end
+    end
+    if(total_pulled > 0) then
+        print(("Retrieved %d from network inventory"):format(total_pulled))
+    end
+    if(total_pulled == 0) then
+        print("Error - Did not retrieve any blocks")
+    end
+    return total_pulled
+end
+M.retrieveItemsWhiteList = retrieveItemsWhiteList
 
 
 -- Deposit all items of a specified name into network inventory
@@ -413,37 +496,6 @@ end
 M.turtleHasItemNotInList = turtleHasItemNotInList
 
 
--- Get at least one chunk loader from the network inventory
--- @return Boolean true if chunk loader was retrieved
-function retrieveChunkLoaders()
-    print("Retrieving fuel")
-    peri = peri or "front"
-    if(not connected_to_inventory and not connectToInventory(peri)) then
-        print("Not connected to network")
-        print("Unable to retrieve fuel")
-        return false
-    end
-
-    local count = 0 
-    -- Look at every item in the chest
-    for slot, item in pairs(chest.list()) do
-        -- Compare this item to every valid chunk loader
-        for i, val in ipairs(CHUNK_LOADERS) do
-            if(val == item.name) then
-                num_pulled = chest.pushItems(turtleName, slot)
-                count = count + num_pulled
-                print(("Retrieved %d %s from chest"):format(num_pulled, item.name))
-                if(count > 0) then
-                    return true
-                end
-            end
-        end
-    end
-    return false
-end
-M.retrieveChunkLoaders = retrieveChunkLoaders
-
-
 -- Check if the slot has a chunk loader
 -- @param slot (Optional) This number refers to the slot we are looking at
 -- @return Boolean specifying if there is a chunk loader in this slot
@@ -470,7 +522,8 @@ local function getChunkLoaderIfNotInInventory()
             end
         end
     end
-    while(retrieveChunkLoaders() and total < 2) do
+    while(retrieveItemsWhiteList(CHUNK_LOADERS, 2) and total < 2) do
+        --TODO
     end
     return total > 1
 end

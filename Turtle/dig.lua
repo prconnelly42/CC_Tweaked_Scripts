@@ -182,43 +182,11 @@ function buildBridgeRow(size)
 end
 
 
-function retrieveBlocks()
+-- Retrieve valid bridge blocks
+-- @return Boolean specifying if we have successfully retrieved any blocks
+function retrieveBridgeBlocks()
     print("Retrieving blocks")
-    TU.sleep(0.2)
-    local modem = peripheral.wrap("front")
-    local turtleName = modem.getNameLocal()
-    local chest = peripheral.find("inventory")
-    local chest_name = peripheral.getName(chest)
-    total_pulled = 0
-    -- Look at every item in the chest
-    for slot, item in pairs(chest.list()) do
-        local valid_block = true
-        -- Compare this item to every valid fuel and invalid block
-        for i, val in ipairs(VALID_FUEL) do
-            if(val == item.name) then
-                valid_block = false
-                break
-            end
-        end
-        for i, val in ipairs(INVALID_BLOCKS) do
-            if(val == item.name) then
-                valid_block = false
-                break
-            end
-        end
-        if(valid_block) then
-            num_pulled = chest.pushItems(turtleName, slot)
-            total_pulled = total_pulled + num_pulled
-            if(num_pulled > 0) then
-                print(("Retrieved %d %s from chest"):format(num_pulled, item.name))
-            end
-        end
-    end
-    if(total_pulled == 0) then
-        print("Error - Did not retrieve any blocks")
-        return false
-    end
-    return true
+    return TU.retrieveItemsBlackList(INVALID_BLOCKS, 1000)
 end
 
 
