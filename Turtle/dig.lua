@@ -1,14 +1,14 @@
 local TU = require "turtle_utilities"
 local U = require "utilities"
 
-INVALID_BLOCKS = {'minecraft:gravel', 'minecraft:sand', 'minecraft:charcoal', 'minecraft:anvil',
+local INVALID_BLOCKS = {'minecraft:gravel', 'minecraft:sand', 'minecraft:charcoal', 'minecraft:anvil',
 'minecraft:chipped_anvil', 'minecraft:damaged_anvil', 'minecraft:red_sand', 'minecraft:bucket',
 'chunkloaders:basic_chunk_loader', 'minecraft:lava_bucket'}
 
-current_length = 0
-minimum_fuel_level = 0
-reset = false
-size = 0
+local current_length = 0
+local minimum_fuel_level = 0
+local reset = false
+local size = 0
 --local w_modem = peripheral.wrap("right") or error("No modem attached", 0)
 
 
@@ -29,7 +29,7 @@ end
 
 -- Place a bridge block down if necessary
 -- @return Boolean true if a block exists below the turtle
-function placeValidBridgeBlockDown()
+function placeBridgeBlockDown()
     if(turtle.detectDown()) then
         return true
     end
@@ -61,18 +61,18 @@ function digTunnelSquare(size, build_bridge)
     elseif(size == 1) then
         TU.moveForward()
         if(build_bridge) then
-            placeValidBridgeBlockDown()
+            placeBridgeBlockDown()
         end
     else
         current_line = 1
         -- Dig one square of dimensions (size x size)
         TU.moveForward()
         if(build_bridge) then
-            placeValidBridgeBlockDown()
+            placeBridgeBlockDown()
         end
         while(current_line <= size) do
             local start_from_left = false
-            if(offset_from_origin_x == 0) then
+            if(turtle_offset.x == 0) then
                 start_from_left = true
             end
             position = 1
@@ -88,7 +88,7 @@ function digTunnelSquare(size, build_bridge)
                 end
                 TU.moveForward()
                 if(current_line == 1 and build_bridge) then
-                    placeValidBridgeBlockDown()
+                    placeBridgeBlockDown()
                 end
                 position = position + 1
             end
@@ -139,14 +139,14 @@ function buildBridgeRow(size)
         return false
     else
         local start_from_left = false
-        if(offset_from_origin_x == 0) then
+        if(turtle_offset.x == 0) then
             start_from_left = true
         end
 
         for i=1,size do
             TU.moveForward()
             turtle.digUp()
-            if(not placeValidBridgeBlockDown()) then
+            if(not placeBridgeBlockDown()) then
                 return false
             end
 
@@ -172,7 +172,7 @@ function buildBridgeRow(size)
 
     current_length = current_length + 1
     
-    if(AUTO_LOAD_CHUNKS) then
+    if(TU.AUTO_LOAD_CHUNKS) then
         minimum_fuel_level = size + (size + current_length)*3
     else
         minimum_fuel_level = size + current_length
@@ -186,16 +186,7 @@ end
 -- @return Boolean specifying if we have successfully retrieved any blocks
 function retrieveBridgeBlocks()
     print("Retrieving blocks")
-    return TU.retrieveItemsBlackList(INVALID_BLOCKS, 1000)
-end
-
-
--- Move the turtle down one spot
--- @param movement_order Vector - see TU.goToOffset
--- @return Boolean specifying if we have successfully moved
-function returnToOrigin(movement_order)
-    print("Returning to origin")
-    return TU.goToOffset(vector.new(0,0,0), movement_order)
+    return TU.retrieveItemsBlackList(INVALID_BLOCKS, 1000, "back")
 end
 
 
@@ -212,26 +203,13 @@ end
 -- @return Boolean - true if we successfully reset
 function resetState(bridge_flag)
     local success = nil
+    success = TU.resetState("yxz", minimum_fuel_level)
     TU.printFuelInfo()
-    returnToOrigin()
-    success = TU.depositAllBlacklist(TU.CHUNK_LOADERS) and TU.retrieveFuel(minimum_fuel_level)
-
-    if(AUTO_LOAD_CHUNKS) then
-        success = success and TU.getChunkLoaderIfNotInInventory()
-        local old_chunk_loader_location_x = chunk_loader_location_x
-        local old_chunk_loader_location_z = chunk_loader_location_z
-        if(placeChunkLoader()) then
-            print("chunk loader place")
-        end
-        retrieveLastChunkLoader(old_chunk_loader_location_x, old_chunk_loader_location_z)
-    end
 
     if(bridge_flag) then
-        success = success and (retrieveBlocks() or validBlockExists())
+        success = success and (retrieveBridgeBlocks() or validBlockExists())
     end
     
-    TU.turn("R")
-    TU.turn("R")
     reset = true
     print(("Reset successful: %s"):format(tostring(success)))
     return success

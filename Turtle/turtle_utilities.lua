@@ -17,7 +17,8 @@ local turtleName = nil
 local turtle_facing_direction = 0
 local turtle_offset = vector.new(0, 0, 0)
 local chunk_loader_offset = nil
-local type_of_chunk_loader = M.CHUNK_LOADER_3X3
+local chunk_loader_type = M.CHUNK_LOADER_3X3
+local chunk_loader_direction  = "up"
 
 
 -- Print current fuel level to the console
@@ -30,7 +31,7 @@ M.printFuelInfo = printFuelInfo
 -- Turn the turtle
 -- @param direction This string is the direction to turn (either "R" or "L")
 -- @return Boolean specifying if we have successfully turned
-function turn(direction)
+local function turn(direction)
     local success
     if(direction == "R") then
         success = turtle.turnRight()
@@ -48,7 +49,7 @@ M.turn = turn
 -- Turn the turtle to face a particular direction
 -- @param target_facing_direction This number is between 0 and 3, 0 being the direction upon program start
 -- @return Boolean specifying if we are facing the target direction
-function turnToFace(target_facing_direction)
+local function turnToFace(target_facing_direction)
     assert(target_facing_direction >=0 and target_facing_direction < 4)
     local success = true
     if(math.fmod(turtle_facing_direction - target_facing_direction + 4, 4) == 1) then
@@ -239,7 +240,7 @@ M.depositAllOfType = depositAllOfType
 -- @param target_item_name This table is a list with the names of the item to deposit
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to front
 -- @return Boolean specifying if we have successfully deposited all of the items
-function depositAllWhitelist(target_item_list, peri)
+local function depositAllWhitelist(target_item_list, peri)
     peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
@@ -276,7 +277,7 @@ M.depositAllWhitelist = depositAllWhitelist
 -- @param target_item_name This table is a list with the names of the item not to deposit
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to front
 -- @return Boolean specifying if we have successfully deposited all of the items
-function depositAllBlacklist(target_item_list, peri)
+local function depositAllBlacklist(target_item_list, peri)
     peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
@@ -339,10 +340,11 @@ M.refuel = refuel
 
 
 -- Refuel the turtle using available fuel in its inventory
--- @param minimum_fuel_level This number is the fuel level at which to stop refueling
+-- @param minimum_fuel_level (Optional) This number is the fuel level at which to stop refueling
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
 -- @return Boolean specifying if the turtle has refueled past the minimum level
 local function retrieveFuel(minimum_fuel_level, peri)
+    minimum_fuel_level = minimum_fuel_level or 1
     print("Retrieving fuel")
     peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
@@ -441,7 +443,7 @@ M.getNumOfThisItemInInventory = getNumOfThisItemInInventory
 
 -- Test if turtle inventory is empty
 -- @return Boolean true if inventory is empty, false otherwise
-function isInventoryEmpty()
+local function isInventoryEmpty()
     for i=1,16 do
         turtle.select(i)
         if(turtle.getItemCount() ~= 0) then
@@ -455,7 +457,7 @@ M.isInventoryEmpty = isInventoryEmpty
 
 -- Test if there is at least one empty slot in turtle inventory
 -- @return Boolean true if empty slot exists
-function emptySlotExists()
+local function emptySlotExists()
     for i=1,16 do
         if(turtle.getItemCount(i) == 0) then
             return true
@@ -469,7 +471,7 @@ M.emptySlotExists = emptySlotExists
 -- Check that an item from the given list is in the turtle's inventory
 -- @param target_item_name This table is the list to check
 -- @return Boolean true if an item from the list is present
-function turtleHasItemInList(target_item_list)
+local function turtleHasItemInList(target_item_list)
     for i=1,16 do
         turtle.select(i)
         if(TU.selectedSlotHasItemInThisList(target_item_list)) then
@@ -484,7 +486,7 @@ M.turtleHasItemInList = turtleHasItemInList
 -- Check that an item from the turtle's inventory is not in the given list
 -- @param target_item_name This table is the list to check
 -- @return Boolean true if an item not from the list is present
-function turtleHasItemNotInList(target_item_list)
+local function turtleHasItemNotInList(target_item_list)
     for i=1,16 do
         turtle.select(i)
         if(not TU.selectedSlotHasItemInThisList(target_item_list)) then
@@ -512,26 +514,19 @@ local function getChunkLoaderIfNotInInventory()
     if(chunk_loader_offset ~= nil) then
         total = 1
     end
-    for i=1,16 do
-        turtle.select(i)
-        local count = turtle.getItemCount()
-        if(isChunkLoader() and count > 0) then
-            total = total + count
-            if(total > 1) then
-                return true
-            end
-        end
+    total = total + getNumOfThisItemInInventory(chunk_loader_type)
+
+    if(total < 2) then
+        total = total + retrieveItemsWhiteList(CHUNK_LOADERS, 2)
     end
-    while(retrieveItemsWhiteList(CHUNK_LOADERS, 2) and total < 2) do
-        --TODO
-    end
+
     return total > 1
 end
 M.getChunkLoaderIfNotInInventory = getChunkLoaderIfNotInInventory
 
 
 -- Place a specific item in a specific direction
--- @param direction This string is the name of the direction to place in
+-- @param direction This string is the name of the direction to place in ("forward", "up", or "down")
 -- @param slot (Optional) This number is the slot with the item we are attempting to place (Defaults to selected)
 -- @param can_dig (Optional) This boolean specifies if we can dig the current block that is present (Defaults to false)
 -- @return Boolean specifying if we have successfully placed the item
@@ -569,7 +564,7 @@ M.placeItemOfType = placeItemOfType
 
 -- Place a specific item in a specific direction
 -- @param target_item_name This string is the name of the item to place
--- @param direction This string is the name of the direction to place in
+-- @param direction - String - See function placeItem
 -- @param can_dig (Optional) This boolean specifies if we can dig the current block that is present (Defaults to false)
 -- @return Boolean specifying if we have successfully placed the item
 local function placeItemOfType(target_item_name, direction, can_dig)
@@ -606,17 +601,22 @@ M.placeItemOfType = placeItemOfType
 
 
 -- Place a chunk loader up
--- @return Boolean specifying if we have successfully placed
-function placeChunkLoader()
-    for i=1,16 do
-        turtle.select(i)
-        if(isChunkLoader() and turtle.placeUp()) then
+-- @param direction - String - (Optional - defaults to "up") See function placeItem
+-- @return Boolean specifying if we have successfully placed the chunk loader
+local function placeChunkLoader(direction)
+    direction = direction or "up"
+    if(placeItemOfType(chunk_loader_type, direction, true)) then
+        if(direction == "forward") then
+            chunk_loader_offset = turtle_offset:add(vector.new(0, 0, 1))
+        elseif(direction == "up") then
             chunk_loader_offset = turtle_offset:add(vector.new(0, 1, 0))
-            return true
+        elseif(direction == "down") then
+            chunk_loader_offset = turtle_offset:add(vector.new(0, -1, 0))
         end
+        return true
+    else
+        return false
     end
-
-    return false
 end
 M.placeChunkLoader = placeChunkLoader
 
@@ -625,7 +625,7 @@ M.placeChunkLoader = placeChunkLoader
 -- @param old_chunk_loader_offset - Vector
 -- @param movement_order Vector - see goToOffset()
 -- @return Boolean specifying if we have succeeded
-function retrieveLastChunkLoader(old_chunk_loader_offset, movement_order)
+local function retrieveLastChunkLoader(old_chunk_loader_offset, movement_order)
     assert(old_chunk_loader_offset ~= nil)
 
     local current_turtle_offset = turtle_offset
@@ -637,23 +637,27 @@ function retrieveLastChunkLoader(old_chunk_loader_offset, movement_order)
     goToOffset(current_turtle_offset, movement_order)
     turnToFace(current_turtle_direction)
 
-    return getNumOfThisItemInInventory(type_of_chunk_loader) > 0
+    return getNumOfThisItemInInventory(chunk_loader_type) > 0
 end
+M.retrieveLastChunkLoader = retrieveLastChunkLoader
 
 
 -- Place a new chunk loader, retrieve the previous, and return to the current position
--- @param new_offset This vector offset the turtle wants to move to
--- @param check_separation This boolean, if true, means we should only replace the chunk loader
+-- @param new_offset (Optional - defaults to current_offset) This vector offset the turtle wants to move to
+-- @param Boolean check_separation - (Optional - defaults to false) If true, 
+--  only replace chunk loader if separation threshold is met
+-- @param direction - (Optional) See function placeChunkLoader
 -- if we are about to exceed its maximum range
 -- @return Boolean specifying if we have succeeded
-function replaceChunkLoader(new_offset, check_separation)
+local function replaceChunkLoader(new_offset, check_separation, direction)
     check_separation = check_separation or false
+    direction = direction or chunk_loader_direction
     if(AUTO_LOAD_CHUNKS) then
         local separation = new_offset:sub(chunk_loader_offset)
-        local chunk_loader_range = M.CHUNK_LOADERS[type_of_chunk_loader]
-        if(separation:length() > chunk_loader_range - 1) then
+        local chunk_loader_range = M.CHUNK_LOADERS[chunk_loader_type]
+        if(separation:length() > chunk_loader_range - 1 or not check_separation) then
             local old_chunk_loader_offset = chunk_loader_offset
-            if(placeChunkLoader()) then
+            if(placeChunkLoader(direction)) then
                 print("Placed chunk loader")
             else
                 print("Failed to place chunk loader")
@@ -669,11 +673,12 @@ function replaceChunkLoader(new_offset, check_separation)
     end
     return true
 end
+M.replaceChunkLoader = replaceChunkLoader
 
 
 -- Move the turtle backward one spot
 -- @return Boolean specifying if we have successfully moved
-function moveBackward()
+local function moveBackward()
     local new_offset = turtle_offset
 
     if(turtle_facing_direction == 0) then
@@ -703,7 +708,7 @@ M.moveBackward = moveBackward
 -- Move the turtle forward one spot
 -- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
 -- @return Boolean specifying if we have successfully moved
-function moveForward(can_dig)
+local function moveForward(can_dig)
     can_dig = can_dig or true
     local new_offset = turtle_offset
 
@@ -738,7 +743,7 @@ M.moveForward = moveForward
 -- Move the turtle up one spot
 -- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
 -- @return Boolean specifying if we have successfully moved
-function moveUp(can_dig)
+local function moveUp(can_dig)
     can_dig = can_dig or true
     local new_offset = turtle_offset
 
@@ -766,7 +771,7 @@ M.moveUp = moveUp
 -- Move the turtle down one spot
 -- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
 -- @return Boolean specifying if we have successfully moved
-function moveDown(can_dig)
+local function moveDown(can_dig)
     can_dig = can_dig or true
     local new_offset = turtle_offset
 
@@ -796,7 +801,7 @@ M.moveDown = moveDown
 -- @param movement_order A String designating the order axes are to be moved on, from left to right
 --  Ex: xyz, zxy, yzx, xy, zx, y. Default is xyz
 -- @return Boolean specifying if the turtle_offset matches the target_offset
-function goToOffset(target_offset, movement_order)
+local function goToOffset(target_offset, movement_order)
     movement_order = movement_order or "xyz"
     for c in movement_order:gmatch"." do
         if(c == "x") then
@@ -834,7 +839,21 @@ end
 M.goToOffset = goToOffset
 
 
+local function resetState(movement_order, minimum_fuel_level)
+    goToOffset(vector.new(0,0,0), movement_order)
+    local success = depositAllBlacklist(CHUNK_LOADERS) and retrieveFuel(minimum_fuel_level)
+    
+    if(AUTO_LOAD_CHUNKS) then
+        success = success and getChunkLoaderIfNotInInventory()
+        success = success and replaceChunkLoader()
+    end
+
+    TU.turnToFace(0)
+
+    return success
+
+end
+M.resetPosition = resetPosition
+
 
 return M
-
-
