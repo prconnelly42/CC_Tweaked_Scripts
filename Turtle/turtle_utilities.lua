@@ -9,6 +9,7 @@ M.EMPTY_BUCKET = 'minecraft:bucket'
 M.CHUNK_LOADERS = {'chunkloaders:basic_chunk_loader'}
 M.VALID_FUEL = {'minecraft:coal', 'minecraft:charcoal', 'minecraft:coal_block', 'minecraft:lava_bucket'}
 M.CHUNK_LOADERS = {'chunkloaders:basic_chunk_loader' : 16}
+M.CHUNK_LOADER_DEFAULT_DIRECTION = "up"
 
 local connected_to_inventory = false
 local network_inventory = nil
@@ -18,7 +19,6 @@ local turtle_facing_direction = 0
 local turtle_offset = vector.new(0, 0, 0)
 local chunk_loader_offset = nil
 local chunk_loader_type = M.CHUNK_LOADER_3X3
-local chunk_loader_direction  = "up"
 
 
 -- Print current fuel level to the console
@@ -651,7 +651,7 @@ M.retrieveLastChunkLoader = retrieveLastChunkLoader
 -- @return Boolean specifying if we have succeeded
 local function replaceChunkLoader(new_offset, check_separation, direction)
     check_separation = check_separation or false
-    direction = direction or chunk_loader_direction
+    direction = direction or CHUNK_LOADER_DEFAULT_DIRECTION
     if(AUTO_LOAD_CHUNKS) then
         local separation = new_offset:sub(chunk_loader_offset)
         local chunk_loader_range = M.CHUNK_LOADERS[chunk_loader_type]
