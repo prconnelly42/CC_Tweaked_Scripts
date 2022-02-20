@@ -8,7 +8,7 @@ M.CHUNK_LOADER_3X3 = 'chunkloaders:basic_chunk_loader'
 M.EMPTY_BUCKET = 'minecraft:bucket'
 M.CHUNK_LOADERS = {'chunkloaders:basic_chunk_loader'}
 M.VALID_FUEL = {'minecraft:coal', 'minecraft:charcoal', 'minecraft:coal_block', 'minecraft:lava_bucket'}
-M.CHUNK_LOADERS = {'chunkloaders:basic_chunk_loader' : 16}
+M.CHUNK_LOADERS = {['chunkloaders:basic_chunk_loader'] = 16}
 M.CHUNK_LOADER_DEFAULT_DIRECTION = "up"
 
 local connected_to_inventory = false
@@ -69,6 +69,7 @@ M.turnToFace = turnToFace
 -- @return Boolean specifying if we have successfully connected to the network inventory
 local function connectToInventory(peri)
     U.sleep(0.3)
+    peri = peri or "back"
     modem = peripheral.wrap(peri)
     turtleName = modem.getNameLocal()
     network_inventory = peripheral.find("inventory")
@@ -95,12 +96,11 @@ M.disconnectFromInventory = disconnectFromInventory
 -- Retrieve specific item from network inventory
 -- @param target_item_name This string is the name of the item to deposit
 -- @param count (Optional) Number - how many of this item we're attempting to get
--- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
+-- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if we have successfully retrieved at least one of the target item
 local function retrieveItem(target_item_name, count, peri)
     assert(type(target_item_name) == "string")
     assert(count > 0)
-    peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
         print(("Unable to retrieve %s"):format(target_item_name))
@@ -119,7 +119,7 @@ local function retrieveItem(target_item_name, count, peri)
         print(("Retrieved %d %s from network inventory"):format(total_pulled, target_item_name))
     end
     if(total_pulled == 0) then
-        print("Error - Did not retrieve any blocks")
+        print(("Error - Did not retrieve any %s"):format(target_item_name))
     end
     return total_pulled
 end
@@ -129,12 +129,11 @@ M.retrieveItem = retrieveItem
 -- Retrieve specific item from network inventory
 -- @param item_list This table is a list of the items to skip when retrieving
 -- @param count (Optional) Number - how many items we're attempting to get
--- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
+-- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if we have successfully retrieved at least one item
 local function retrieveItemsBlackList(item_list, count, peri)
     assert(type(item_list) == "table")
     assert(count > 0)
-    peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
         print(("Unable to retrieve %s"):format(target_item_name))
@@ -160,7 +159,7 @@ local function retrieveItemsBlackList(item_list, count, peri)
         print(("Retrieved %d from network inventory"):format(total_pulled))
     end
     if(total_pulled == 0) then
-        print("Error - Did not retrieve any blocks")
+        print("Error - Did not retrieve any items not in list")
     end
     return total_pulled
 end
@@ -170,12 +169,12 @@ M.retrieveItemsBlackList = retrieveItemsBlackList
 -- Retrieve specific item from network inventory
 -- @param item_list This table is a list of the items retrieve from
 -- @param count (Optional) Number - how many items we're attempting to get
--- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
+-- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if we have successfully retrieved at least one item
 local function retrieveItemsWhiteList(item_list, count, peri)
     assert(type(item_list) == "table")
     assert(count > 0)
-    peri = peri or "front"
+    U.any_tostring(item_list)
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
         print(("Unable to retrieve %s"):format(target_item_name))
@@ -201,7 +200,7 @@ local function retrieveItemsWhiteList(item_list, count, peri)
         print(("Retrieved %d from network inventory"):format(total_pulled))
     end
     if(total_pulled == 0) then
-        print("Error - Did not retrieve any blocks")
+        print("Error - Did not retrieve any items from list")
     end
     return total_pulled
 end
@@ -210,10 +209,9 @@ M.retrieveItemsWhiteList = retrieveItemsWhiteList
 
 -- Deposit all items of a specified name into network inventory
 -- @param target_item_name This string is the name of the item to deposit
--- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
+-- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if we have successfully deposited all of the specified items
 local function depositAllOfType(target_item_name, peri)
-    peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
         print(("Unable to deposit %s"):format(target_item_name))
@@ -241,7 +239,6 @@ M.depositAllOfType = depositAllOfType
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to front
 -- @return Boolean specifying if we have successfully deposited all of the items
 local function depositAllWhitelist(target_item_list, peri)
-    peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
         print("Unable to deposit items in list")
@@ -278,7 +275,6 @@ M.depositAllWhitelist = depositAllWhitelist
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to front
 -- @return Boolean specifying if we have successfully deposited all of the items
 local function depositAllBlacklist(target_item_list, peri)
-    peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
         print("Unable to deposit items not in list")
@@ -341,12 +337,11 @@ M.refuel = refuel
 
 -- Refuel the turtle using available fuel in its inventory
 -- @param minimum_fuel_level (Optional) This number is the fuel level at which to stop refueling
--- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "front"
+-- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if the turtle has refueled past the minimum level
 local function retrieveFuel(minimum_fuel_level, peri)
     minimum_fuel_level = minimum_fuel_level or 1
     print("Retrieving fuel")
-    peri = peri or "front"
     if(not connected_to_inventory and not connectToInventory(peri)) then
         print("Not connected to network")
         print("Unable to retrieve fuel")
@@ -358,18 +353,18 @@ local function retrieveFuel(minimum_fuel_level, peri)
         -- Look at every item in the network inventory
     for slot, item in pairs(network_inventory.list()) do
         -- Compare this item to every valid fuel
-        for i, val in ipairs(VALID_FUEL) do
+        for i, val in ipairs(M.VALID_FUEL) do
             if(val == item.name) then
                 if(turtle.getFuelLevel() >= minimum_fuel_level*10) then
                     print("Max fuel")
                     max_fuel_flag = true
-                    depositAllOfType(EMPTY_BUCKET)
+                    depositAllOfType(M.EMPTY_BUCKET)
                     break
                 end
                 num_pulled = network_inventory.pushItems(turtleName, slot)
                 print(("Retrieved %d %s"):format(num_pulled, item.name))
                 refuel()
-                depositAllOfType(EMPTY_BUCKET)
+                depositAllOfType(M.EMPTY_BUCKET)
                 break
             end
         end
@@ -474,7 +469,7 @@ M.emptySlotExists = emptySlotExists
 local function turtleHasItemInList(target_item_list)
     for i=1,16 do
         turtle.select(i)
-        if(TU.selectedSlotHasItemInThisList(target_item_list)) then
+        if(selectedSlotHasItemInThisList(target_item_list)) then
             return true
         end
     end
@@ -489,7 +484,7 @@ M.turtleHasItemInList = turtleHasItemInList
 local function turtleHasItemNotInList(target_item_list)
     for i=1,16 do
         turtle.select(i)
-        if(not TU.selectedSlotHasItemInThisList(target_item_list)) then
+        if(not selectedSlotHasItemInThisList(target_item_list)) then
             return true
         end
     end
@@ -502,7 +497,7 @@ M.turtleHasItemNotInList = turtleHasItemNotInList
 -- @param slot (Optional) This number refers to the slot we are looking at
 -- @return Boolean specifying if there is a chunk loader in this slot
 local function isChunkLoader(slot)
-    return selectedSlotHasItemInThisList(CHUNK_LOADERS, slot)
+    return selectedSlotHasItemInThisList(M.CHUNK_LOADERS, slot)
 end
 M.isChunkLoader = isChunkLoader
 
@@ -517,7 +512,8 @@ local function getChunkLoaderIfNotInInventory()
     total = total + getNumOfThisItemInInventory(chunk_loader_type)
 
     if(total < 2) then
-        total = total + retrieveItemsWhiteList(CHUNK_LOADERS, 2)
+        print("Getting chunk loaders from network inventory")
+        total = total + retrieveItemsWhiteList(U.getTableKeys(M.CHUNK_LOADERS), 2)
     end
 
     return total > 1
@@ -651,8 +647,8 @@ M.retrieveLastChunkLoader = retrieveLastChunkLoader
 -- @return Boolean specifying if we have succeeded
 local function replaceChunkLoader(new_offset, check_separation, direction)
     check_separation = check_separation or false
-    direction = direction or CHUNK_LOADER_DEFAULT_DIRECTION
-    if(AUTO_LOAD_CHUNKS) then
+    direction = direction or M.CHUNK_LOADER_DEFAULT_DIRECTION
+    if(M.AUTO_LOAD_CHUNKS) then
         local separation = new_offset:sub(chunk_loader_offset)
         local chunk_loader_range = M.CHUNK_LOADERS[chunk_loader_type]
         if(separation:length() > chunk_loader_range - 1 or not check_separation) then
@@ -695,7 +691,7 @@ local function moveBackward()
         return false
     end
 
-    if(not turtle.back())
+    if(not turtle.back()) then
         return false
     else
         turtle_offset = new_offset
@@ -730,7 +726,7 @@ local function moveForward(can_dig)
         turtle.dig()
     end
 
-    if(not turtle.forward())
+    if(not turtle.forward()) then
         return false
     else
         turtle_offset = new_offset
@@ -757,7 +753,7 @@ local function moveUp(can_dig)
         turtle.digUp()
     end
 
-    if(not turtle.up())
+    if(not turtle.up()) then
         return false
     else
         turtle_offset = new_offset
@@ -785,7 +781,7 @@ local function moveDown(can_dig)
         turtle.digDown()
     end
 
-    if(not turtle.down())
+    if(not turtle.down()) then
         return false
     else
         turtle_offset = new_offset
@@ -841,19 +837,19 @@ M.goToOffset = goToOffset
 
 local function resetState(movement_order, minimum_fuel_level)
     goToOffset(vector.new(0,0,0), movement_order)
-    local success = depositAllBlacklist(CHUNK_LOADERS) and retrieveFuel(minimum_fuel_level)
+    local success = depositAllBlacklist(M.CHUNK_LOADERS) and retrieveFuel(minimum_fuel_level)
     
-    if(AUTO_LOAD_CHUNKS) then
+    if(M.AUTO_LOAD_CHUNKS) then
         success = success and getChunkLoaderIfNotInInventory()
-        success = success and replaceChunkLoader()
+        success = success and replaceChunkLoader(vector.new(0,0,0))
     end
 
-    TU.turnToFace(0)
+    turnToFace(0)
 
     return success
 
 end
-M.resetPosition = resetPosition
+M.resetState = resetState
 
 
 return M
