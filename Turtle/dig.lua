@@ -72,7 +72,7 @@ function digTunnelSquare(size, build_bridge)
         end
         while(current_line <= size) do
             local start_from_left = false
-            if(turtle_offset.x == 0) then
+            if(TU.getTurtleOffset().x == 0) then
                 start_from_left = true
             end
             position = 1
@@ -139,7 +139,7 @@ function buildBridgeRow(size)
         return false
     else
         local start_from_left = false
-        if(turtle_offset.x == 0) then
+        if(TU.getTurtleOffset().x == 0) then
             start_from_left = true
         end
 
@@ -268,6 +268,9 @@ function main()
             if(not reset_success) then
                 break
             end
+        end
+        if(current_length == target_length) then
+            print("Dig is complete")
         end
         print("Program terminated - Resetting")
         resetState(false)
