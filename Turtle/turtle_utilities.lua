@@ -10,6 +10,7 @@ M.CHUNK_LOADERS = {'chunkloaders:basic_chunk_loader'}
 M.VALID_FUEL = {'minecraft:coal', 'minecraft:charcoal', 'minecraft:coal_block', 'minecraft:lava_bucket'}
 M.CHUNK_LOADERS = {['chunkloaders:basic_chunk_loader'] = 16}
 M.CHUNK_LOADER_DEFAULT_DIRECTION = "up"
+M.ORIGIN_OFFSET = vector.new(0,0,0)
 
 local connected_to_inventory = false
 local network_inventory = nil
@@ -44,6 +45,7 @@ local emptySlotExists
 local turtleHasItemInList
 local turtleHasItemNotInList
 local isChunkLoader
+local getSideBlockName
 local getChunkLoaderIfNotInInventory
 local placeItem
 local placeItemOfType
@@ -115,7 +117,7 @@ M.turnToFace = turnToFace
 function connectToInventory(peri)
     U.sleep(0.3)
     peri = peri or "back"
-    modem = peripheral.wrap(peri)
+    modem = peripheral.wrap(peri) or error(("Could not connect to '%s' modem"):format(peri))
     turtleName = modem.getNameLocal()
     network_inventory = peripheral.find("inventory")
     if(modem == nil or turtleName == nil or network_inventory == nil) then
@@ -164,7 +166,7 @@ function retrieveItem(target_item_name, count, peri)
         print(("Retrieved %d %s from network inventory"):format(total_pulled, target_item_name))
     end
     if(total_pulled == 0) then
-        print(("Error - Did not retrieve any %s"):format(target_item_name))
+        error(("Error - Did not retrieve any %s"):format(target_item_name))
     end
     return total_pulled
 end
@@ -204,7 +206,7 @@ function retrieveItemsBlackList(item_list, count, peri)
         print(("Retrieved %d from network inventory"):format(total_pulled))
     end
     if(total_pulled == 0) then
-        print("Error - Did not retrieve any items not in list")
+        error("Error - Did not retrieve any items not in list")
     end
     return total_pulled
 end
@@ -245,7 +247,7 @@ function retrieveItemsWhiteList(item_list, count, peri)
         print(("Retrieved %d from network inventory"):format(total_pulled))
     end
     if(total_pulled == 0) then
-        print("Error - Did not retrieve any items from list")
+        error("Error - Did not retrieve any items from list")
     end
     return total_pulled
 end
@@ -547,6 +549,31 @@ end
 M.isChunkLoader = isChunkLoader
 
 
+-- Get the name of a block above, in front of, or below the turtle
+-- @param String direction - "up", "front", or "down"
+-- @return String - the name of the block
+function getSideBlockName(direction)
+    local block_exists = nil
+    local block_details = nil
+
+    if(direction == "up") then
+        block_exists, block_details = turtle.inspectUp()
+    elseif(direction == "front") then
+        block_exists, block_details = turtle.inspect()
+    elseif(direction == "down") then
+        block_exists, block_details = turtle.inspectDown()
+    else
+        error("Invalid direction for block inspection")
+    end
+
+    if(block_exists) then
+        return block_details.name
+    end
+    return nil
+end
+M.getSideBlockName = getSideBlockName
+
+
 -- Make sure there is 2 chunk loaders in inventory, or 1 placed and one in inventory
 -- @param String peri (Optional) - The name of the peripheral to wrap (E.g. front, top, back)
 -- @return Boolean specifying if there is a chunk loader in this slot
@@ -554,7 +581,11 @@ function getChunkLoaderIfNotInInventory(peri)
     local total = 0
     if(chunk_loader_offset ~= nil) then
         total = 1
+    elseif(U.listContains(U.getTableKeys(M.CHUNK_LOADERS), getSideBlockName("up"))) then
+        total = 1
+        chunk_loader_offset = turtle_offset:add(vector.new(0,1,0))
     end
+
     total = total + getNumOfThisItemInInventory(chunk_loader_type)
 
     if(total < 2) then
@@ -875,7 +906,7 @@ function replaceChunkLoader(new_offset, check_separation, direction)
                 print("Failed to place chunk loader")
                 return false
             end
-            if(old_chunk_loader_offset ~= nil) then
+            if(old_chunk_loader_offset ~= nil and chunk_loader_offset ~= old_chunk_loader_offset) then
                 if(not retrieveLastChunkLoader(old_chunk_loader_offset)) then
                     print("Failed to retrieve previous chunk loader")
                     return false
@@ -893,11 +924,14 @@ M.replaceChunkLoader = replaceChunkLoader
 -- @return Boolean specifying if we have succeeded
 function resetState(movement_order, minimum_fuel_level)
     goToOffset(vector.new(0,0,0), movement_order)
+    turnToFace(2)
     local success = depositAllBlacklist(M.CHUNK_LOADERS, "front") and retrieveFuel(minimum_fuel_level, "front")
     
     if(M.AUTO_LOAD_CHUNKS) then
         success = success and getChunkLoaderIfNotInInventory("front")
-        success = success and replaceChunkLoader(vector.new(0,0,0))
+        if(chunk_loader_offset == nil or not chunk_loader_offset:equals(M.ORIGIN_OFFSET)) then
+            success = success and replaceChunkLoader(M.ORIGIN_OFFSET)
+        end
     end
 
     turnToFace(0)

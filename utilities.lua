@@ -1,10 +1,33 @@
 -- Module containing various utility functions for computers
 local M = {}
 
+M.LOG_LEVEL_SET = "debug"
+M.LOG_LEVELS = {["error"] = 0, ["warning"] = 1, ["info"] = 2, ["debug"] = 3}
+
+-- Function Declarations --
+local log
+local sleep
+local moveCursorToBeginningOfLine
+local getTableKeys
+local listContains
+local any_tostring
+local tablelength
+
+-- Log messages
+-- @param String message - the log message
+-- @param String level - the logging level ("debug", "error", "warning", "info") 
+function log(message, level)
+    assert(listContains(getTableKeys(M.LOG_LEVELS), level))
+    if(level >= M.LOG_LEVELS[M.LOG_LEVEL_SET]) then
+        print(("%s: %s"):format(level, message))
+    end
+end
+M.log = log
+
 
 -- Pause for a specified period of time
 -- @param n This is a float specifing the number of seconds to sleep
-local function sleep(n)
+function sleep(n)
     local t = os.clock()
     while os.clock() - t <= n do
       -- nothing
@@ -14,7 +37,7 @@ M.sleep = sleep
 
 
 -- Clear the line and move the cursor to left side of the terminal
-local function moveCursorToBeginningOfLine()
+function moveCursorToBeginningOfLine()
     term.clearLine()
     local cursor_x = nil
     local cursor_y = nil
@@ -28,7 +51,7 @@ M.moveCursorToBeginningOfLine = moveCursorToBeginningOfLine
 -- Get a list of keys from a dictionary
 -- @param table inTable - The dictionary to get keys from 
 -- @return table - List of keys
-local function getTableKeys(inTable)
+function getTableKeys(inTable)
     local keyset = {}
     local n = 0
     for k,v in pairs(inTable) do
@@ -38,6 +61,21 @@ local function getTableKeys(inTable)
     return keyset
 end
 M.getTableKeys = getTableKeys
+
+
+-- Check if a value is in a list
+-- @param Table inList - the list of elements to check
+-- @param target - the target to check for
+-- @return Boolean - true if the element is in the list, false otherwise
+function listContains(inList, target)
+    for _, e in pairs(inList) do
+        if e == target then
+          return true
+        end
+    end
+    return false
+end
+M.listContains = listContains
 
 
 -- Code modified from https://stackoverflow.com/questions/9168058/how-to-dump-a-table-to-console
@@ -64,7 +102,7 @@ M.any_tostring = any_tostring
 -- Code taken from https://stackoverflow.com/questions/2705793/how-to-get-number-of-entries-in-a-lua-table
 -- @param table input - any table
 -- @return number - the length of the table
-local function tablelength(input)
+function tablelength(input)
     local count = 0
     for _ in pairs(input) do 
         count = count + 1 
