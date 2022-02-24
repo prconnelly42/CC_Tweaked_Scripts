@@ -42,7 +42,7 @@ function placeBridgeBlockDown()
         end
     end
 
-    print("Unable to place block")
+    U.log("Unable to place block", "warning")
 
     return false
 end
@@ -51,13 +51,12 @@ end
 -- Dig one square of the tunnel
 -- @param size This number is the width of the tunnel square
 -- @param build_bridge Boolean true means we place down bridge blocks as we dig
--- @return Boolean specifying if we have successfully dug a square
 function digTunnelSquare(size, build_bridge)
     U.moveCursorToBeginningOfLine()
     term.write(("Building row %d\n"):format(current_length + 1))
     if(size <=0) then
-        print("Tunnel size cannot be 0 or negative")
-        return false
+        U.log("Tunnel size cannot be 0 or negative", "error")
+        error("Tunnel size cannot be 0 or negative")
     elseif(size == 1) then
         TU.moveForward()
         if(build_bridge) then
@@ -123,20 +122,17 @@ function digTunnelSquare(size, build_bridge)
     if(TU.AUTO_LOAD_CHUNKS) then
         minimum_fuel_level = size*size + current_length*2
     end
-
-    return true
 end
 
 
 -- Build row of the bridge with specified width over 1 block length
 -- @param size This number is the width of the bridge
--- @return Boolean specifying if we have successfully built a row
 function buildBridgeRow(size)
     U.moveCursorToBeginningOfLine()
     term.write(("Building row %d\n"):format(current_length + 1))
     if(size <=0) then
-        print("Bridge size cannot be 0 or negative")
-        return false
+        U.log("Bridge size cannot be 0 or negative", "error")
+        error("Bridge size cannot be 0 or negative")
     else
         local start_from_left = false
         if(TU.getTurtleOffset().x == 0) then
@@ -177,15 +173,13 @@ function buildBridgeRow(size)
     else
         minimum_fuel_level = size + current_length
     end
-
-    return true
 end
 
 
 -- Retrieve valid bridge blocks
 -- @return Boolean specifying if we have successfully retrieved any blocks
 function retrieveBridgeBlocks()
-    print("Retrieving blocks")
+    U.log("Retrieving blocks", "debug")
     return TU.retrieveItemsBlackList(INVALID_BLOCKS, 1000, "back")
 end
 
@@ -193,7 +187,7 @@ end
 -- Move the turtle to the current end of the tunnel
 -- @return Boolean specifying if we have successfully moved
 function goToCurrentEndOfTunnel()
-    print("Going to current tunnel end")
+    U.log("Going to current tunnel end", "info")
     return TU.goToOffset(vector.new(0, 0, current_length))
 end
 
@@ -201,22 +195,27 @@ end
 -- Return to program start state
 -- @param bridge_flag Boolean - true if we are building a bridge
 -- @return Boolean - true if we successfully reset
-function resetState(bridge_flag)
+function resetStateAndCheckBlocks(bridge_flag)
+    U.log("function: resetStateAndCheckBlocks", "debug")
     local success = nil
     success = TU.resetState("yxz", minimum_fuel_level)
-    TU.printFuelInfo()
+    TU.logFuelInfo()
 
     if(bridge_flag) then
         success = success and (retrieveBridgeBlocks() or validBlockExists())
     end
     
     reset = true
-    print(("Reset successful: %s"):format(tostring(success)))
+    U.log(("Reset successful: %s"):format(tostring(success)), "debug")
     return success
 end
 
 -- Function will always run at program start
 function main()
+    if(U.SEND_LOGS == true) then
+        enableRemoteLogging("right")
+    end
+    
     if(arg[1] == "tunnel" or arg[1] == "tunnelbridge" or arg[1] == "bridge") then
         tunnelbridge = false
         bridge_flag = false
@@ -242,7 +241,7 @@ function main()
         else
             minimum_fuel_level = current_length*2 + size*size
         end
-        resetState(bridge_flag)
+        resetStateAndCheckBlocks(bridge_flag)
         while (current_length < target_length) do
             if(turtle.getFuelLevel() > minimum_fuel_level and (bridge_flag or TU.emptySlotExists())) then
                 if(reset) then
@@ -251,16 +250,20 @@ function main()
                 end
                 dig_success = false
                 if(bridge_flag) then
-                    dig_success = buildBridgeRow(size)
+                    if(pcall(buildBridgeRow(size))) then
+                        dig_success = true
+                    end
                 else
-                    dig_success = digTunnelSquare(size, tunnelbridge)
+                    if(pcall(digTunnelSquare(size, tunnelbridge))) then
+                        dig_success = true
+                    end   
                 end
                 if(not dig_success) then
-                    print("Error digging/building")
-                    reset_success = resetState(bridge_flag)
+                    U.log("Attempting recovery from error digging/building", "info")
+                    reset_success = resetStateAndCheckBlocks(bridge_flag)
                 end
             elseif(not reset) then
-                reset_success = resetState(bridge_flag)
+                reset_success = resetStateAndCheckBlocks(bridge_flag)
             else
                 break
             end
@@ -270,15 +273,15 @@ function main()
             end
         end
         if(current_length == target_length) then
-            print("Dig is complete")
+            U.log("Dig is complete", "info")
         end
-        print("Program terminated - Resetting")
-        resetState(false)
+        resetStateAndCheckBlocks(false)
     elseif(arg[1] == "refuel") then
         TU.refuel()
     else
         print("Please enter valid command")
     end
+    U.log("Program terminated")
 end
 
 main()

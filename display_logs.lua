@@ -1,37 +1,21 @@
+local U = require "utilities"
+
+-- Function Declarations
+local connect_monitor
+local reset_display
+local scroll_display
+local scroll_display_down
+local write_newline_to_display
+local display_logs
+local display_logs_main
+
+
+-- Global Variables
 local b_modem
 local monitor
 local display_buffer = {}
 local first_line_displayed_index
 local last_line_displayed_index
-
--------------------
--- BEGIN UTILITIES
--------------------
-
-
-function sleep(n)
-    local t = os.clock()
-    while os.clock() - t <= n do
-      -- nothing
-    end
-end
-
-
-function tablelength(T)
-    local count = 0
-    for _ in pairs(T) do count = count + 1 end
-    return count
-end
-
-
-function shift_table_left(T)
-    table.insert( T, table.remove(T))
-end
-
-
--------------------
--- END UTILITIES
--------------------
 
 
 function connect_monitor()
@@ -61,7 +45,7 @@ function scroll_display(direction)
         monitor.setCursorPos(1, 1)
         first_line_displayed_index = first_line_displayed_index - 1
         monitor.write(display_buffer[first_line_displayed_index])
-    elseif(direction == "down" and last_line_displayed_index < tablelength(display_buffer) - 1) then
+    elseif(direction == "down" and last_line_displayed_index < U.tablelength(display_buffer) - 1) then
         monitor.scroll(1)
         monitor.setCursorPos(1, height - 1)
         last_line_displayed_index = last_line_displayed_index + 1
@@ -73,7 +57,7 @@ end
 function scroll_display_down()
     assert(monitor ~= nil)
     monitor.scroll(1)
-    shift_table_left(display_buffer)
+    U.shiftTableLeft(display_buffer)
     table.remove(display_buffer)
 end
 
@@ -83,7 +67,7 @@ function write_newline_to_display(text)
     local width
     local height
     width, height = monitor.getSize()
-    local num_lines = tablelength(display_buffer)
+    local num_lines = U.tablelength(display_buffer)
     if(num_lines < height) then
         num_lines = num_lines + 1
     else
@@ -116,12 +100,12 @@ function display_logs()
 end
 
 
-function main()
+function display_logs_main()
     connect_monitor()
     reset_display()
     display_logs()
 end
 
 
-main()
+display_logs_main()
   

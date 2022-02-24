@@ -23,7 +23,7 @@ local chunk_loader_type = M.CHUNK_LOADER_3X3
 
 -- Function Declarations --
 local getTurtleOffset
-local printFuelInfo
+local logFuelInfo
 local turn
 local turnToFace
 local connectToInventory
@@ -69,10 +69,10 @@ M.getTurtleOffset = getTurtleOffset
 
 
 -- Print current fuel level to the console
-function printFuelInfo()
-    print(("Current fuel: %s"):format(turtle.getFuelLevel()))
+function logFuelInfo()
+    U.log(("Current fuel: %s"):format(turtle.getFuelLevel()), "info")
 end
-M.printFuelInfo = printFuelInfo
+M.logFuelInfo = logFuelInfo
 
 
 -- Turn the turtle
@@ -923,6 +923,8 @@ M.replaceChunkLoader = replaceChunkLoader
 -- @param minimum_fuel_level (Optional) This number is the fuel level at which to stop refueling
 -- @return Boolean specifying if we have succeeded
 function resetState(movement_order, minimum_fuel_level)
+    U.log("function: resetState", "debug")
+    U.log("Resetting State", "info")
     goToOffset(vector.new(0,0,0), movement_order)
     turnToFace(2)
     local success = depositAllBlacklist(M.CHUNK_LOADERS, "front") and retrieveFuel(minimum_fuel_level, "front")

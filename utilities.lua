@@ -2,10 +2,15 @@
 local M = {}
 
 M.LOG_LEVEL_SET = "debug"
+M.REMOTE_LOG_LEVEL = "info"
 M.LOG_LEVELS = {["error"] = 0, ["warning"] = 1, ["info"] = 2, ["debug"] = 3}
+M.PRINT_LOGS_TO_CONSOLE = true
+M.SEND_LOGS = true
 
 -- Function Declarations --
 local log
+local enableRemoteLogging
+local sendLogMessage
 local sleep
 local moveCursorToBeginningOfLine
 local getTableKeys
@@ -13,16 +18,58 @@ local listContains
 local any_tostring
 local tablelength
 
+-- Global variables
+local remote_logging_enabled = false
+local log_pc_id = nil
+local modem = nil
+
 -- Log messages
 -- @param String message - the log message
 -- @param String level - the logging level ("debug", "error", "warning", "info") 
+-- @param Table modem (Optional) - the modem on which to send the logs
 function log(message, level)
-    assert(listContains(getTableKeys(M.LOG_LEVELS), level))
-    if(level >= M.LOG_LEVELS[M.LOG_LEVEL_SET]) then
+    assert(listContains(getTableKeys(M.LOG_LEVELS), level)) -- Check the level is valid
+    if(M.LOG_LEVELS[level] <= M.LOG_LEVELS[M.LOG_LEVEL_SET]) then
         print(("%s: %s"):format(level, message))
+    end
+    if(M.SEND_LOGS and M.LOG_LEVELS[level] <= M.LOG_LEVELS[M.REMOTE_LOG_LEVEL]) then
+        local status, err = pcall(sendLogMessage(("%s: %s"):format(level, message)))
+        if(not status) then
+            log(err, "warning")
+        end
     end
 end
 M.log = log
+
+
+-- Discover the logging pc to enable remote logging
+-- @param String name - the modem to wrap ("top", "right", etc)
+-- @throws error
+function enableRemoteLogging(name)
+    modem = peripheral.wrap(name)
+    if(modem == nil) then
+        error("No logging modem attached")
+    end
+    local remote_pc_id = rednet.lookup("logip")
+    if(remote_pc_id == nil) then
+        error("No logging PC found")
+    end
+    log_pc_id = remote_pc_id
+    remote_logging_enabled = true
+end
+M.enableRemoteLogging = enableRemoteLogging
+
+
+-- Send a message to the logging PC
+-- @param String message - the message to be logged
+-- @throws error
+function sendLogMessage(message)
+    local success = rednet.send(log_pc_id, message, "logip")
+    if(not success) then
+        error("Logging PC is unavailable. Ensure remote logging has been enabled.")
+    end
+end
+M.sendLogMessage = sendLogMessage
 
 
 -- Pause for a specified period of time
@@ -112,3 +159,13 @@ end
 M.tablelength = tablelength
 
 return M
+
+
+-- Perform a shift left operation on the table
+-- Ex: {1, 2, 3} -> {2, 3, 1}
+-- @param Table table_in - the table to perform the operation on
+-- @return Table - the modified table
+function shiftTableLeft(table_in)
+    table.insert(table_in, table.remove(table_in))
+    return table_in
+end
