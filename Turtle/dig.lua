@@ -212,10 +212,17 @@ end
 
 -- Function will always run at program start
 function main()
-    if(U.SEND_LOGS == true) then
-        enableRemoteLogging("right")
+    if(arg[1] == "help") then
+        print("usage: dig <program> <width> <length> [current_length]")
+        print("program options are 'tunnel' and 'bridge'")
+        return
     end
-    
+
+    if(U.SEND_LOGS == true) then
+        U.enableLocalLogging()
+        U.enableRemoteLogging("left")
+    end
+
     if(arg[1] == "tunnel" or arg[1] == "tunnelbridge" or arg[1] == "bridge") then
         tunnelbridge = false
         bridge_flag = false
@@ -281,7 +288,7 @@ function main()
     else
         print("Please enter valid command")
     end
-    U.log("Program terminated")
+    U.log("Program terminated", "info")
 end
 
 main()

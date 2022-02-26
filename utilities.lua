@@ -1,14 +1,17 @@
 -- Module containing various utility functions for computers
 local M = {}
 
-M.LOG_LEVEL_SET = "debug"
+M.FILE_LOG_LEVEL = "debug"
+M.CONSOLE_LOG_LEVEL = "info"
 M.REMOTE_LOG_LEVEL = "info"
 M.LOG_LEVELS = {["error"] = 0, ["warning"] = 1, ["info"] = 2, ["debug"] = 3}
 M.PRINT_LOGS_TO_CONSOLE = true
 M.SEND_LOGS = true
+M.LOG_FILE_NAME = fs.getName(shell.getRunningProgram()) .. "_logs.log"
 
 -- Function Declarations --
 local log
+local enableLocalLogging
 local enableRemoteLogging
 local sendLogMessage
 local sleep
@@ -22,24 +25,38 @@ local tablelength
 local remote_logging_enabled = false
 local log_pc_id = nil
 local modem = nil
+local log_level = M.DEFAULT_LOG_LEVEL
+local log_file_handle = nil
 
 -- Log messages
 -- @param String message - the log message
--- @param String level - the logging level ("debug", "error", "warning", "info") 
+-- @param String level - a logging level (see M.LOG_LEVELS)
 -- @param Table modem (Optional) - the modem on which to send the logs
 function log(message, level)
     assert(listContains(getTableKeys(M.LOG_LEVELS), level)) -- Check the level is valid
-    if(M.LOG_LEVELS[level] <= M.LOG_LEVELS[M.LOG_LEVEL_SET]) then
+    if(M.LOG_LEVELS[level] <= M.LOG_LEVELS[M.FILE_LOG_LEVEL]) then
+        log_file_handle.write(os.time("utc") .. " " .. ("%s: %s"):format(level, message) .. "\n")
+    end
+    if(M.LOG_LEVELS[level] <= M.LOG_LEVELS[M.CONSOLE_LOG_LEVEL]) then
         print(("%s: %s"):format(level, message))
     end
-    if(M.SEND_LOGS and M.LOG_LEVELS[level] <= M.LOG_LEVELS[M.REMOTE_LOG_LEVEL]) then
-        local status, err = pcall(sendLogMessage(("%s: %s"):format(level, message)))
+    if((M.SEND_LOGS and remote_logging_enabled) and M.LOG_LEVELS[level] <= M.LOG_LEVELS[M.REMOTE_LOG_LEVEL]) then
+        local status, err = pcall(sendLogMessage, ("%s: %s"):format(level, message))
         if(not status) then
-            log(err, "warning")
+            print(err, "warning")
         end
     end
 end
 M.log = log
+
+
+-- Open a log file for writing
+-- @param String path (Optional) - file path to write to
+function enableLocalLogging(path)
+    path = path or M.LOG_FILE_NAME
+    log_file_handle = fs.open(path, "w")
+end
+M.enableLocalLogging = enableLocalLogging
 
 
 -- Discover the logging pc to enable remote logging
@@ -50,6 +67,7 @@ function enableRemoteLogging(name)
     if(modem == nil) then
         error("No logging modem attached")
     end
+    rednet.open(name)
     local remote_pc_id = rednet.lookup("logip")
     if(remote_pc_id == nil) then
         error("No logging PC found")
@@ -158,8 +176,6 @@ function tablelength(input)
 end
 M.tablelength = tablelength
 
-return M
-
 
 -- Perform a shift left operation on the table
 -- Ex: {1, 2, 3} -> {2, 3, 1}
@@ -169,3 +185,6 @@ function shiftTableLeft(table_in)
     table.insert(table_in, table.remove(table_in))
     return table_in
 end
+M.shiftTableLeft = shiftTableLeft
+
+return M

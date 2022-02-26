@@ -63,6 +63,7 @@ local resetState
 -- Get the current offset of the turtle from it's starting point
 -- @return Vector - the current offset of the turtle
 function getTurtleOffset()
+    U.log("function: getTurtleOffset", "debug")
     return turtle_offset
 end
 M.getTurtleOffset = getTurtleOffset
@@ -70,6 +71,7 @@ M.getTurtleOffset = getTurtleOffset
 
 -- Print current fuel level to the console
 function logFuelInfo()
+    U.log("function: logFuelInfo", "debug")
     U.log(("Current fuel: %s"):format(turtle.getFuelLevel()), "info")
 end
 M.logFuelInfo = logFuelInfo
@@ -79,6 +81,7 @@ M.logFuelInfo = logFuelInfo
 -- @param direction This string is the direction to turn (either "R" or "L")
 -- @return Boolean specifying if we have successfully turned
 function turn(direction)
+    U.log("function: turn", "debug")
     local success
     if(direction == "R") then
         success = turtle.turnRight()
@@ -97,7 +100,8 @@ M.turn = turn
 -- @param target_facing_direction This number is between 0 and 3, 0 being the direction upon program start
 -- @return Boolean specifying if we are facing the target direction
 function turnToFace(target_facing_direction)
-    assert(target_facing_direction >=0 and target_facing_direction < 4)
+    U.log("function: turnToFace", "debug")
+    assert(target_facing_direction >= 0 and target_facing_direction < 4, "Invalid facing direction")
     local success = true
     if(math.fmod(turtle_facing_direction - target_facing_direction + 4, 4) == 1) then
         success = success and turn("L")
@@ -115,13 +119,22 @@ M.turnToFace = turnToFace
 -- @param peri This string is the name of the peripheral to wrap (E.g. front, top, back)
 -- @return Boolean specifying if we have successfully connected to the network inventory
 function connectToInventory(peri)
-    U.sleep(0.3)
+    U.log("function: connectToInventory", "debug")
+    U.sleep(0.3) -- Give time for turtle to complete any movement
     peri = peri or "back"
-    modem = peripheral.wrap(peri) or error(("Could not connect to '%s' modem"):format(peri))
+    modem = peripheral.wrap(peri) 
+    if(modem == nil) then
+        U.log(("Could not connect to '%s' modem"):format(peri), "error")
+        error(("Could not connect to '%s' modem"):format(peri))
+    end
     turtleName = modem.getNameLocal()
     network_inventory = peripheral.find("inventory")
-    if(modem == nil or turtleName == nil or network_inventory == nil) then
-        connected_to_inventory = false
+    if(turtleName == nil) then
+        U.log("Unable to retrieve turtle name", "error")
+        error("Unable to retrieve turtle name", "error")
+    elseif(network_inventory == nil) then
+        U.log("Cannot find network inventory", "error")
+        error("Cannot find network inventory", "error")
     else
         network_inventory_name = peripheral.getName(network_inventory)
         connected_to_inventory = true
@@ -146,12 +159,13 @@ M.disconnectFromInventory = disconnectFromInventory
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if we have successfully retrieved at least one of the target item
 function retrieveItem(target_item_name, count, peri)
-    assert(type(target_item_name) == "string")
-    assert(count > 0)
+    U.log("function: retrieveItem", "debug")
+    assert(type(target_item_name) == "string", "Invalid input")
+    assert(count > 0, "Must retrieve at least 1 item")
+    U.any_tostring(item_list)
     if(not connected_to_inventory and not connectToInventory(peri)) then
-        print("Not connected to network")
-        print(("Unable to retrieve %s"):format(target_item_name))
-        return false
+        U.log("Not connected to network", "error")
+        error("Not connected to network")
     end
 
     local total_pulled = 0
@@ -179,12 +193,13 @@ M.retrieveItem = retrieveItem
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if we have successfully retrieved at least one item
 function retrieveItemsBlackList(item_list, count, peri)
-    assert(type(item_list) == "table")
-    assert(count > 0)
+    U.log("function: retrieveItemsBlackList", "debug")
+    assert(type(item_list) == "table", "Invalid input")
+    assert(count > 0, "Must retrieve at least 1 item")
+    U.any_tostring(item_list)
     if(not connected_to_inventory and not connectToInventory(peri)) then
-        print("Not connected to network")
-        print(("Unable to retrieve %s"):format(target_item_name))
-        return false
+        U.log("Not connected to network", "error")
+        error("Not connected to network")
     end
 
     local total_pulled = 0
@@ -219,13 +234,13 @@ M.retrieveItemsBlackList = retrieveItemsBlackList
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if we have successfully retrieved at least one item
 function retrieveItemsWhiteList(item_list, count, peri)
-    assert(type(item_list) == "table")
-    assert(count > 0)
+    U.log("function: retrieveItemsWhiteList", "debug")
+    assert(type(item_list) == "table", "Invalid input")
+    assert(count > 0, "Must retrieve at least 1 item")
     U.any_tostring(item_list)
     if(not connected_to_inventory and not connectToInventory(peri)) then
-        print("Not connected to network")
-        print(("Unable to retrieve %s"):format(target_item_name))
-        return false
+        U.log("Not connected to network", "error")
+        error("Not connected to network")
     end
 
     local total_pulled = 0
@@ -247,8 +262,10 @@ function retrieveItemsWhiteList(item_list, count, peri)
         print(("Retrieved %d from network inventory"):format(total_pulled))
     end
     if(total_pulled == 0) then
-        error("Error - Did not retrieve any items from list")
+        U.log("Did not retrieve any items from list", "error")
+        error("Did not retrieve any items from list")
     end
+    U.log(("Chunk loaders pulled from inventory: %s"):format(total_pulled), "debug")
     return total_pulled
 end
 M.retrieveItemsWhiteList = retrieveItemsWhiteList
@@ -259,10 +276,10 @@ M.retrieveItemsWhiteList = retrieveItemsWhiteList
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if we have successfully deposited all of the specified items
 function depositAllOfType(target_item_name, peri)
+    U.log("function: depositAllOfType", "debug")
     if(not connected_to_inventory and not connectToInventory(peri)) then
-        print("Not connected to network")
-        print(("Unable to deposit %s"):format(target_item_name))
-        return false
+        U.log("Not connected to network", "error")
+        error("Not connected to network")
     end
 
     for slot=1,16 do
@@ -286,10 +303,10 @@ M.depositAllOfType = depositAllOfType
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to front
 -- @return Boolean specifying if we have successfully deposited all of the items
 function depositAllWhitelist(target_item_list, peri)
+    U.log("function: depositAllWhitelist", "debug")
     if(not connected_to_inventory and not connectToInventory(peri)) then
-        print("Not connected to network")
-        print("Unable to deposit items in list")
-        return false
+        U.log("Not connected to network", "error")
+        error("Not connected to network")
     end
 
     for slot=1,16 do
@@ -306,8 +323,8 @@ function depositAllWhitelist(target_item_list, peri)
             if(valid_item) then
                 network_inventory.pullItems(turtleName, slot)
                 if(turtle.getItemCount() > 0) then
-                    print(("Unable to deposit %s"):format(target_item_name))
-                    return false
+                    U.log(("Unable to deposit %s"):format(target_item_name), "error")
+                    error("Failed to deposit items")
                 end
             end
         end
@@ -322,10 +339,10 @@ M.depositAllWhitelist = depositAllWhitelist
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to front
 -- @return Boolean specifying if we have successfully deposited all of the items
 function depositAllBlacklist(target_item_list, peri)
+    U.log("function: depositAllBlacklist", "debug")
     if(not connected_to_inventory and not connectToInventory(peri)) then
-        print("Not connected to network")
-        print("Unable to deposit items not in list")
-        return false
+        U.log("Not connected to network", "error")
+        error("Not connected to network")
     end
 
     for slot=1,16 do
@@ -342,8 +359,8 @@ function depositAllBlacklist(target_item_list, peri)
             if(valid_item) then
                 network_inventory.pullItems(turtleName, slot)
                 if(turtle.getItemCount() > 0) then
-                    print(("Unable to deposit %s"):format(target_item_name))
-                    return false
+                    U.log(("Unable to deposit %s"):format(target_item_name), "error")
+                    error("Failed to deposit items")
                 end
             end
         end
@@ -357,6 +374,7 @@ M.depositAllBlacklist = depositAllBlacklist
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back).
 -- @return Boolean specifying if we have successfully deposited all of the items
 function depositAll(peri)
+    U.log("function: depositAll", "debug")
     return depositAllBlacklist({}, peri)
 end
 M.depositAll = depositAll
@@ -365,7 +383,9 @@ M.depositAll = depositAll
 -- Refuel the turtle using available fuel in its inventory
 -- @param minimum_fuel_level This number is the fuel level at which to stop refueling
 function refuel(minimum_fuel_level)
-    print("Refueling")
+    U.log("function: refuel", "debug")
+    U.log("Refueling", "info")
+    assert(type(minimum_fuel_level) == "number")
     local need_more_fuel = true
     for i=1,16 do
         turtle.select(i)
@@ -387,12 +407,11 @@ M.refuel = refuel
 -- @param peri (Optional) This string is the name of the peripheral to wrap (E.g. front, top, back). Defaults to "back"
 -- @return Boolean specifying if the turtle has refueled past the minimum level
 function retrieveFuel(minimum_fuel_level, peri)
+    U.log("function: retrieveFuel", "debug")
     minimum_fuel_level = minimum_fuel_level or 1
-    print("Retrieving fuel")
     if(not connected_to_inventory and not connectToInventory(peri)) then
-        print("Not connected to network")
-        print("Unable to retrieve fuel")
-        return false
+        U.log("Not connected to network", "error")
+        error("Not connected to network")
     end
 
     -- While we need more fuel
@@ -403,14 +422,14 @@ function retrieveFuel(minimum_fuel_level, peri)
         for i, val in ipairs(M.VALID_FUEL) do
             if(val == item.name) then
                 if(turtle.getFuelLevel() >= minimum_fuel_level*10) then
-                    print("Max fuel")
+                    U.log("Max fuel", "debug")
                     max_fuel_flag = true
                     depositAllOfType(M.EMPTY_BUCKET)
                     break
                 end
                 num_pulled = network_inventory.pushItems(turtleName, slot)
-                print(("Retrieved %d %s"):format(num_pulled, item.name))
-                refuel()
+                U.log(("Retrieved %d %s"):format(num_pulled, item.name), "debug")
+                refuel(minimum_fuel_level)
                 depositAllOfType(M.EMPTY_BUCKET)
                 break
             end
@@ -429,6 +448,7 @@ M.retrieveFuel = retrieveFuel
 -- @param slot (Optional) This number refers to the slot (defaults to the selected slot)
 -- @return Boolean specifying if the slot has the item
 function selectedSlotHasThisItem(target_item_name, slot)
+    U.log("function: selectedSlotHasThisItem", "debug")
     assert(target_item_name ~= nil, "Cannot check for nil item")
     slot = slot or turtle.getSelectedSlot()
     item = turtle.getItemDetail()
@@ -448,6 +468,7 @@ M.selectedSlotHasThisItem = selectedSlotHasThisItem
 -- @param slot (Optional) This number refers to the slot (defaults to the selected slot)
 -- @return Boolean specifying if the slot has an item from our list
 function selectedSlotHasItemInThisList(target_item_list, slot)
+    U.log("function: getNumOfThisItemInInventory", "debug")
     assert(target_item_name ~= nil, "Cannot check against a nil table")
     slot = slot or turtle.getSelectedSlot()
     item = turtle.getItemDetail()
@@ -471,6 +492,7 @@ M.selectedSlotHasItemInThisList = selectedSlotHasItemInThisList
 -- @param target_item_name This string is the name of the item to count
 -- @return Number of items
 function getNumOfThisItemInInventory(target_item_name)
+    U.log("function: getNumOfThisItemInInventory", "debug")
     local total = 0
     for i=1,16 do
         turtle.select(i)
@@ -486,6 +508,7 @@ M.getNumOfThisItemInInventory = getNumOfThisItemInInventory
 -- Test if turtle inventory is empty
 -- @return Boolean true if inventory is empty, false otherwise
 function isInventoryEmpty()
+    U.log("function: isInventoryEmpty", "debug")
     for i=1,16 do
         turtle.select(i)
         if(turtle.getItemCount() ~= 0) then
@@ -500,6 +523,7 @@ M.isInventoryEmpty = isInventoryEmpty
 -- Test if there is at least one empty slot in turtle inventory
 -- @return Boolean true if empty slot exists
 function emptySlotExists()
+    U.log("function: emptySlotExists", "debug")
     for i=1,16 do
         if(turtle.getItemCount(i) == 0) then
             return true
@@ -514,6 +538,7 @@ M.emptySlotExists = emptySlotExists
 -- @param target_item_name This table is the list to check
 -- @return Boolean true if an item from the list is present
 function turtleHasItemInList(target_item_list)
+    U.log("function: turtleHasItemInList", "debug")
     for i=1,16 do
         turtle.select(i)
         if(selectedSlotHasItemInThisList(target_item_list)) then
@@ -529,6 +554,7 @@ M.turtleHasItemInList = turtleHasItemInList
 -- @param target_item_name This table is the list to check
 -- @return Boolean true if an item not from the list is present
 function turtleHasItemNotInList(target_item_list)
+    U.log("function: turtleHasItemNotInList", "debug")
     for i=1,16 do
         turtle.select(i)
         if(not selectedSlotHasItemInThisList(target_item_list)) then
@@ -544,6 +570,7 @@ M.turtleHasItemNotInList = turtleHasItemNotInList
 -- @param slot (Optional) This number refers to the slot we are looking at
 -- @return Boolean specifying if there is a chunk loader in this slot
 function isChunkLoader(slot)
+    U.log("function: isChunkLoader", "debug")
     return selectedSlotHasItemInThisList(M.CHUNK_LOADERS, slot)
 end
 M.isChunkLoader = isChunkLoader
@@ -553,6 +580,8 @@ M.isChunkLoader = isChunkLoader
 -- @param String direction - "up", "front", or "down"
 -- @return String - the name of the block
 function getSideBlockName(direction)
+    U.log("function: getSideBlockName", "debug")
+    assert(U.listContains({"forward", "up", "down"}, direction), "Invalid direction")
     local block_exists = nil
     local block_details = nil
 
@@ -578,6 +607,9 @@ M.getSideBlockName = getSideBlockName
 -- @param String peri (Optional) - The name of the peripheral to wrap (E.g. front, top, back)
 -- @return Boolean specifying if there is a chunk loader in this slot
 function getChunkLoaderIfNotInInventory(peri)
+    U.log("function: getChunkLoaderIfNotInInventory", "debug")
+    assert(type(peri) == "string", "Invalid peripheral name")
+    U.log(("peripheral: %s"):format(peri), "debug")
     local total = 0
     if(chunk_loader_offset ~= nil) then
         total = 1
@@ -589,10 +621,11 @@ function getChunkLoaderIfNotInInventory(peri)
     total = total + getNumOfThisItemInInventory(chunk_loader_type)
 
     if(total < 2) then
-        print("Getting chunk loaders from network inventory")
+        U.log("Getting chunk loaders from network inventory", "debug")
         total = total + retrieveItemsWhiteList(U.getTableKeys(M.CHUNK_LOADERS), 2, peri)
     end
 
+    U.log(("Total chunk loaders: %d"):format(total), "debug")
     return total > 1
 end
 M.getChunkLoaderIfNotInInventory = getChunkLoaderIfNotInInventory
@@ -604,33 +637,41 @@ M.getChunkLoaderIfNotInInventory = getChunkLoaderIfNotInInventory
 -- @param can_dig (Optional) This boolean specifies if we can dig the current block that is present (Defaults to false)
 -- @return Boolean specifying if we have successfully placed the item
 function placeItem(direction, slot, can_dig)
+    U.log("function: placeItem", "debug")
+    assert(U.listContains({"forward", "up", "down"}, direction), "Invalid direction")
     slot = slot or turtle.getSelectedSlot()
-    assert(slot > 0 and slot < 17)
+    assert(slot > 0 and slot < 17, "Invalid slot")
     turtle.select(slot)
     can_dig = can_dig or false
+    local success = false
     local item = turtle.getItemDetail()
     if(item ~= nil) then
         if(direction == "forward") then
             while(can_dig and turtle.detect()) do
                 turtle.dig()
             end
-            return turtle.place()
+            success = turtle.place()
         elseif(direction == "up") then
             while(can_dig and turtle.detectUp()) do
                 turtle.digUp()
             end
-            return turtle.placeUp()
+            success = turtle.placeUp()
         elseif(direction == "down") then
             while(can_dig and turtle.detectDown()) do
                 turtle.digDown()
             end
-            return turtle.placeDown()
+            success = turtle.placeDown()
         else
-            print("Invalid direction")
-            return false
+            error("Invalid direction")
         end
     end
-    return false
+
+    if(not success) then
+        U.log("Could not place item", "error")
+        error("Could not place item")
+    else
+        return true
+    end
 end
 M.placeItem = placeItem
 
@@ -641,6 +682,8 @@ M.placeItem = placeItem
 -- @param can_dig (Optional) This boolean specifies if we can dig the current block that is present (Defaults to false)
 -- @return Boolean specifying if we have successfully placed the item
 function placeItemOfType(target_item_name, direction, can_dig)
+    U.log("function: placeItemOfType", "debug")
+    assert(U.listContains({"forward", "up", "down"}, direction), "Invalid direction")
     can_dig = can_dig or false
     for i=0,16 do
         if(i ~= 0) then
@@ -663,8 +706,7 @@ function placeItemOfType(target_item_name, direction, can_dig)
                 end
                 return turtle.placeDown()
             else
-                print("Invalid direction")
-                return false
+                error("Invalid direction")
             end
         end
     end
@@ -676,6 +718,7 @@ M.placeItemOfType = placeItemOfType
 -- Move the turtle backward one spot
 -- @return Boolean specifying if we have successfully moved
 function moveBackward()
+    U.log("function: moveBackward", "debug")
     local new_offset = turtle_offset
 
     if(turtle_facing_direction == 0) then
@@ -707,6 +750,7 @@ M.moveBackward = moveBackward
 -- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
 -- @return Boolean specifying if we have successfully moved
 function moveForward(can_dig)
+    U.log("function: moveForward", "debug")
     can_dig = can_dig or true
     local new_offset = turtle_offset
 
@@ -743,6 +787,7 @@ M.moveForward = moveForward
 -- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
 -- @return Boolean specifying if we have successfully moved
 function moveUp(can_dig)
+    U.log("function: moveUp", "debug")
     can_dig = can_dig or true
     local new_offset = turtle_offset
 
@@ -772,6 +817,7 @@ M.moveUp = moveUp
 -- @param can_dig This boolean specifies if we can dig through a block to move. Defaults to true
 -- @return Boolean specifying if we have successfully moved
 function moveDown(can_dig)
+    U.log("function: moveDown", "debug")
     can_dig = can_dig or true
     local new_offset = turtle_offset
 
@@ -803,6 +849,7 @@ M.moveDown = moveDown
 --  Ex: xyz, zxy, yzx, xy, zx, y. Default is xyz
 -- @return Boolean specifying if the turtle_offset matches the target_offset
 function goToOffset(target_offset, movement_order)
+    U.log("function: goToOffset", "debug")
     movement_order = movement_order or "xyz"
     for c in movement_order:gmatch"." do
         if(c == "x") then
@@ -831,7 +878,8 @@ function goToOffset(target_offset, movement_order)
                 moveForward()
             end
         else
-            error("Invalid movement order", 0)
+            U.log("Invalid movement order", "error")
+            error("Invalid movement order")
         end
     end
     
@@ -844,6 +892,7 @@ M.goToOffset = goToOffset
 -- @param direction - String - (Optional - defaults to "up") See function placeItem
 -- @return Boolean specifying if we have successfully placed the chunk loader
 function placeChunkLoader(direction)
+    U.log("function: placeChunkLoader", "debug")
     direction = direction or "up"
     if(placeItemOfType(chunk_loader_type, direction, true)) then
         if(direction == "forward") then
@@ -866,14 +915,15 @@ M.placeChunkLoader = placeChunkLoader
 -- @param movement_order Vector - see goToOffset()
 -- @return Boolean specifying if we have succeeded
 function retrieveLastChunkLoader(old_chunk_loader_offset, movement_order)
-    assert(old_chunk_loader_offset ~= nil)
+    U.log("function: retrieveLastChunkLoader", "debug")
+    assert(old_chunk_loader_offset ~= nil, "No chunk loader to retrieve")
 
     local current_turtle_offset = turtle_offset
     local current_turtle_direction = turtle_facing_direction
     
-    print("Getting last chunk loader")
+    U.log("Getting last chunk loader", "debug")
     goToOffset(old_chunk_loader_offset, movement_order)
-    print("last chunk loader retrieved")
+    U.log("Last chunk loader retrieved", "debug")
     goToOffset(current_turtle_offset, movement_order)
     turnToFace(current_turtle_direction)
 
@@ -887,9 +937,8 @@ M.retrieveLastChunkLoader = retrieveLastChunkLoader
 -- @param Boolean check_separation - (Optional - defaults to false) If true, 
 --  only replace chunk loader if separation threshold is met
 -- @param direction - (Optional) See function placeChunkLoader
--- if we are about to exceed its maximum range
--- @return Boolean specifying if we have succeeded
 function replaceChunkLoader(new_offset, check_separation, direction)
+    U.log("function: replaceChunkLoader", "debug")
     check_separation = check_separation or false
     direction = direction or M.CHUNK_LOADER_DEFAULT_DIRECTION
     if(M.AUTO_LOAD_CHUNKS) then
@@ -901,15 +950,15 @@ function replaceChunkLoader(new_offset, check_separation, direction)
         if(separation:length() > chunk_loader_range - 1 or not check_separation) then
             local old_chunk_loader_offset = chunk_loader_offset
             if(placeChunkLoader(direction)) then
-                print("Placed chunk loader")
+                U.log("Placed chunk loader", "debug")
             else
-                print("Failed to place chunk loader")
-                return false
+                U.log("Failed to place chunk loader", "error")
+                error("Failed to place chunk loader")
             end
             if(old_chunk_loader_offset ~= nil and chunk_loader_offset ~= old_chunk_loader_offset) then
                 if(not retrieveLastChunkLoader(old_chunk_loader_offset)) then
-                    print("Failed to retrieve previous chunk loader")
-                    return false
+                    U.log("Failed to retrieve previous chunk loader", "error")
+                    error("Failed to retrieve previous chunk loader")
                 end
             end
         end
@@ -938,8 +987,8 @@ function resetState(movement_order, minimum_fuel_level)
 
     turnToFace(0)
 
+    U.log(("resetState success: %s"):format(success), "debug")
     return success
-
 end
 M.resetState = resetState
 

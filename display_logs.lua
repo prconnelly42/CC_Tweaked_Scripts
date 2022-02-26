@@ -88,8 +88,8 @@ function display_logs()
         local message
         sender_id, message = rednet.receive("logip")
         local text
-        if(type(message[0]) == "string" and type(message[1] == "string")) then
-            text = message[0] .. ": " .. message[1]
+        if(type(message) == "table" and (type(message[1]) == "string" and type(message[2] == "string"))) then
+            text = message[1] .. ": " .. message[2]
             write_newline_to_display(text)
         elseif(type(message) == "string") then
             write_newline_to_display(message)
